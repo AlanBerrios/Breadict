@@ -125,7 +125,13 @@ const HomeScreen = () => {
           <View style={[styles.statusRow, { marginTop: 10 }]}>
             <Text style={[styles.statusLabel, dynamicStyles.text]}>Ubicación Guardada:</Text>
             <Text style={[styles.statusText, dynamicStyles.subText, { fontWeight: 'normal', flexShrink: 1 }]}>
-              {location ? (location.city ? location.city : (location.latitude ? `Lat: ${location.latitude.toFixed(4)}, Lon: ${location.longitude.toFixed(4)}` : location)) : 'No configurada (Ir a Configuración)'}
+              {location 
+                ? (location.city 
+                  ? location.city 
+                  : (location.latitude 
+                    ? `Lat: ${location.latitude.toFixed(2)}, Lon: ${location.longitude.toFixed(2)}` 
+                    : String(location))) 
+                : 'No configurada (Ir a Configuración)'}
             </Text>
           </View>
         </Card.Content>

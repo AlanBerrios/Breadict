@@ -42,10 +42,17 @@ export const SettingsProvider = ({ children }) => {
       if (storedLimitM) setLimitMorning(parseInt(storedLimitM, 10));
       if (storedLimitA) setLimitAfternoon(parseInt(storedLimitA, 10));
       if (storedLocation) {
+        console.log('Location loaded from storage:', storedLocation);
         try {
-          setLocation(JSON.parse(storedLocation));
+          const parsedLocation = JSON.parse(storedLocation);
+          // Verificar que el objeto resultante sea válido
+          if (parsedLocation && (parsedLocation.latitude || parsedLocation.city)) {
+            setLocation(parsedLocation);
+          } else {
+            // Si es un string simple pero falló el parse (o es un string de versión vieja)
+            setLocation({ latitude: null, longitude: null, city: storedLocation });
+          }
         } catch (parseError) {
-          // Fallback para strings antiguos de versión anterior (ej: "Santiago,CL")
           setLocation({ latitude: null, longitude: null, city: storedLocation });
         }
       }
