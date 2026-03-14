@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: breadict-backend
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app_flask:app
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.x
+      - key: OPENWEATHERMAP_API_KEY
+        sync: false

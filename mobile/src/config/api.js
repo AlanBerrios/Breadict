@@ -1,12 +1,13 @@
-// Configuración de la API
+// Archivo de configuración para las URLs de la API
+// Cambia la IP por la IP local de tu computadora en la red WiFi cuando trabajes localmente
+// Para producción, cambia BASE_URL por la URL de tu backend en la nube (ej: Render, Railway, etc.)
+
 export const API_CONFIG = {
-  // Cambia esta URL cuando uses Ngrok o cuando subas a producción
-  BASE_URL: __DEV__ ? 'http://192.168.100.5:5000' : 'http://tu-servidor.com:5000',
-  
-  // Endpoints
+  // BASE_URL de producción en Render
+  BASE_URL: 'https://breadict-backend.onrender.com', // <-- SE REEMPLAZARÁ UNA VEZ DESPLEGADO
   ENDPOINTS: {
-    PREDICCION: '/api/prediccion',
     REGISTRO: '/api/registro',
+    PREDICCION: '/api/prediccion',
     ESTADISTICAS: '/api/estadisticas',
     HEALTH: '/api/health'
   }

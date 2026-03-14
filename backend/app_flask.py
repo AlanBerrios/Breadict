@@ -7,17 +7,18 @@ import os
 import requests
 import json
 import traceback
-from urllib.parse import urlparse
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import pickle
 import threading
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Importar nuestra clase de base de datos
 from database import PanaderiaDB
 
 # --- Configuración Inicial ---
-OPENWEATHERMAP_API_KEY = "c644cd8961008ba78cea6524e87c18ff"
+OPENWEATHERMAP_API_KEY = os.getenv("OPENWEATHERMAP_API_KEY", "")
 CIUDAD_API = "Santiago,CL"
 
 # Mapeo de climas
@@ -383,17 +384,53 @@ def obtener_prediccion():
 
 @app.route('/api/estadisticas', methods=['GET'])
 def obtener_estadisticas():
-    """Obtiene estadísticas básicas del sistema"""
+    """Obtiene estadísticas básicas y el historial comparativo de predicción vs venta real de los últimos 5 días"""
     try:
         total_registros = db.contar_registros() if db is not None else 0
         
+        historial = []
+        if db is not None:
+            df = db.obtener_todos_los_datos()
+            if not df.empty:
+                # Ordenar por fecha y tomar los últimos 5
+                df_reciente = df.sort_values(by='fecha', ascending=False).head(5)
+                
+                # Invertir para que el orden sea cronológico normal
+                df_reciente = df_reciente.iloc[::-1]
+                
+                for _, row in df_reciente.iterrows():
+                    vendido_total = int(row['pan_vendido_maniana']) + int(row['pan_vendido_tarde'])
+                    
+                    # Intentar re-predecir el pasado basado en el clima del registro para compararlo
+                    try:
+                        clima_num = MAPEO_CLIMA_TEXTO_A_NUMERO.get(str(row['clima_promedio']).lower(), 3)
+                        p_man, p_tar, _ = realizar_prediccion(
+                            str(row['fecha']), 
+                            float(row['temperatura_minima']),
+                            float(row['temperatura_maxima']),
+                            clima_num
+                        )
+                        predicho_total = (p_man or 0) + (p_tar or 0)
+                    except Exception as e:
+                        print(f"Error generando histórico para {row['fecha']}: {e}")
+                        predicho_total = 0
+                        
+                    historial.append({
+                        "fecha": str(row['fecha'])[-5:], # Solo mes y dia "MM-DD"
+                        "vendido": vendido_total,
+                        "predicho": predicho_total
+                    })
+
         return jsonify({
             "total_registros": total_registros,
             "modelos_entrenados": modelo_maniana_global is not None and modelo_tarde_global is not None,
-            "ultima_actualizacion": datetime.datetime.now().isoformat()
+            "ultima_actualizacion": datetime.datetime.now().isoformat(),
+            "historial_comparativo": historial
         }), 200
         
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/health', methods=['GET'])

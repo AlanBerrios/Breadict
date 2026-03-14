@@ -73,8 +73,8 @@ class ApiService {
       const message = error.response.data.error || 'Error del servidor';
       return new Error(message);
     } else if (error.request) {
-      // No se recibió respuesta
-      return new Error('No se puede conectar al servidor. Verifica tu conexión y la URL del servidor.');
+      // No se recibió respuesta (falla de red o servidor apagado)
+      return new Error('Sin conexión a Internet o el servidor está apagado. Revisa tu WiFi o reinicia el servidor.');
     } else {
       // Error al configurar la petición
       return new Error('Error de configuración: ' + error.message);

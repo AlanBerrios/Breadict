@@ -144,6 +144,43 @@ const HomeScreen = () => {
         </Card>
       )}
 
+      {/* Gráfica de Predicción vs Realidad */}
+      {estadisticas && estadisticas.historial_comparativo && estadisticas.historial_comparativo.length > 0 && (
+        <Card style={[styles.card, dynamicStyles.card]}>
+          <Card.Content>
+            <Title style={dynamicStyles.text}>Efectividad de IA</Title>
+            <Paragraph style={[dynamicStyles.subText, { marginBottom: 15 }]}>Últimos 5 días (Kilos Totales)</Paragraph>
+            
+            <View style={styles.chartLegend}>
+               <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: isDarkMode ? '#81C784' : '#4CAF50' }]} /><Text style={dynamicStyles.subText}>Vendido</Text></View>
+               <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: isDarkMode ? '#64B5F6' : '#2196F3' }]} /><Text style={dynamicStyles.subText}>Predicho</Text></View>
+            </View>
+
+            {estadisticas.historial_comparativo.map((item, index) => {
+              const maxVal = Math.max(...estadisticas.historial_comparativo.map(h => Math.max(h.vendido, h.predicho)), 1);
+              const pctVendido = (item.vendido / maxVal) * 100;
+              const pctPredicho = (item.predicho / maxVal) * 100;
+              
+              return (
+                <View key={index} style={styles.chartRow}>
+                  <Text style={[styles.chartLabel, dynamicStyles.text]}>{item.fecha}</Text>
+                  <View style={[styles.barsContainer, { borderLeftColor: isDarkMode ? '#444' : '#ccc' }]}>
+                    <View style={styles.barWrapper}>
+                       <View style={[styles.bar, { width: `${pctVendido}%`, backgroundColor: isDarkMode ? '#81C784' : '#4CAF50' }]} />
+                        <Text style={[styles.barText, { color: isDarkMode ? '#aaa' : '#666' }]}>{item.vendido} kg</Text>
+                    </View>
+                    <View style={styles.barWrapper}>
+                       <View style={[styles.bar, { width: `${pctPredicho}%`, backgroundColor: isDarkMode ? '#64B5F6' : '#2196F3' }]} />
+                        <Text style={[styles.barText, { color: isDarkMode ? '#aaa' : '#666' }]}>{item.predicho} kg</Text>
+                    </View>
+                  </View>
+                </View>
+              )
+            })}
+          </Card.Content>
+        </Card>
+      )}
+
       {/* Botones de Acción */}
       <View style={styles.buttonContainer}>
         <TouchableOpacity
@@ -332,6 +369,15 @@ const styles = StyleSheet.create({
     width: '100%',
     paddingVertical: 5,
   },
+  chartLegend: { flexDirection: 'row', justifyContent: 'center', marginBottom: 15 },
+  legendItem: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 10 },
+  legendDot: { width: 12, height: 12, borderRadius: 6, marginRight: 5 },
+  chartRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+  chartLabel: { width: 50, fontSize: 13, fontWeight: 'bold' },
+  barsContainer: { flex: 1, paddingLeft: 10, borderLeftWidth: 1 },
+  barWrapper: { flexDirection: 'row', alignItems: 'center', marginVertical: 3 },
+  bar: { height: 14, borderRadius: 7, minWidth: 5 },
+  barText: { fontSize: 11, marginLeft: 6, fontWeight: 'bold' },
 });
 
 export default HomeScreen;
