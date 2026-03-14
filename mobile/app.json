@@ -30,6 +30,11 @@
     "plugins": [
       "expo-font"
     ],
-    "description": "Sistema inteligente para predecir compras de pan en panaderías"
+    "description": "Sistema inteligente para predecir compras de pan en panaderías",
+    "extra": {
+      "eas": {
+        "projectId": "3b5f681d-e9d4-4175-b273-5b63710522ce"
+      }
+    }
   }
 }

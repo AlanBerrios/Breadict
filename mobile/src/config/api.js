@@ -3,8 +3,8 @@
 // Para producción, cambia BASE_URL por la URL de tu backend en la nube (ej: Render, Railway, etc.)
 
 export const API_CONFIG = {
-  // BASE_URL de producción en Render
-  BASE_URL: 'https://breadict-backend.onrender.com', // <-- SE REEMPLAZARÁ UNA VEZ DESPLEGADO
+  // BASE_URL de producción real en Render
+  BASE_URL: 'https://breadict.onrender.com',
   ENDPOINTS: {
     REGISTRO: '/api/registro',
     PREDICCION: '/api/prediccion',
