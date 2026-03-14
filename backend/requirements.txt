@@ -1,0 +1,7 @@
+# Dependencias del Backend Flask
+flask
+flask-cors
+pandas
+scikit-learn
+requests
+numpy
