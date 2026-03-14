@@ -108,11 +108,16 @@ const ConfiguracionScreen = () => {
         cityName = reverse[0].city || reverse[0].subregion || reverse[0].region || 'Desconocido';
       }
 
-      setTempLocation({
+      const newLoc = {
         latitude: currentLoc.coords.latitude,
         longitude: currentLoc.coords.longitude,
         city: cityName
-      });
+      };
+      
+      setTempLocation(newLoc);
+      // Auto-save location immediately to context/storage
+      await updateLocation(newLoc);
+      
       Alert.alert('Éxito', `Coordenadas GPS obtenidas: ${cityName}.`);
     } catch (e) {
       Alert.alert('Error', 'No se pudo obtener la ubicación GPS.');

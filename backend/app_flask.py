@@ -57,6 +57,7 @@ def obtener_pronostico_api(fecha_target_str, lat=None, lon=None):
         return "manual"
     
     url = None
+    masked_key = f"{OPENWEATHERMAP_API_KEY[:4]}...{OPENWEATHERMAP_API_KEY[-4:]}" if len(OPENWEATHERMAP_API_KEY or "") > 8 else "INVALID"
     try:
         fecha_target_dt = datetime.datetime.strptime(fecha_target_str, "%Y-%m-%d").date()
         hoy_dt = datetime.date.today()
@@ -67,8 +68,10 @@ def obtener_pronostico_api(fecha_target_str, lat=None, lon=None):
         # Siempre intentar usar forecast para tener la min/max global del dia
         if lat and lon:
             url = f"http://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}&appid={OPENWEATHERMAP_API_KEY}&units=metric&lang=es"
+            print(f"[API Backend] URL construida (coords): http://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}&appid={masked_key}...")
         else:
             url = f"http://api.openweathermap.org/data/2.5/forecast?q={CIUDAD_API}&appid={OPENWEATHERMAP_API_KEY}&units=metric&lang=es"
+            print(f"[API Backend] URL construida (ciudad): http://api.openweathermap.org/data/2.5/forecast?q={CIUDAD_API}&appid={masked_key}...")
 
         response = requests.get(url)
         response.raise_for_status()
@@ -108,12 +111,12 @@ def obtener_pronostico_api(fecha_target_str, lat=None, lon=None):
         return round(min(temps_min_dia)), round(max(temps_max_dia)), clima_num, clima_map_str
 
     except requests.exceptions.HTTPError as http_err:
+        print(f"[API Backend] Error HTTP {http_err.response.status_code}: {http_err.response.text[:200]}")
         if http_err.response.status_code == 401: 
-            print("[API Backend] Error 401: No autorizado. Verifica API Key.")
-        else: 
-            print(f"[API Backend] Error HTTP: {http_err}")
+            print("[API Backend] Error 401: No autorizado. Verifica API Key en Entorno.")
     except Exception as e:
         print(f"[API Backend] Error inesperado: {e}")
+        traceback.print_exc()
     return "manual"
 
 def preparar_datos_para_entrenamiento(df):
@@ -343,6 +346,7 @@ def obtener_prediccion():
             temp_max = request.args.get('temp_max')
             
             if not all([clima_num, temp_min, temp_max]):
+                print("[API Backend] Fallaron datos de clima y no hay datos manuales en la petición.")
                 return jsonify({
                     "error": "No se pudo obtener clima de API y no se proporcionaron datos manuales",
                     "requeridos": ["clima_num", "temp_min", "temp_max"]
@@ -353,14 +357,16 @@ def obtener_prediccion():
                 temp_min = float(temp_min)
                 temp_max = float(temp_max)
                 fuente_clima = "Datos manuales"
-            except ValueError:
-                return jsonify({"error": "Parámetros manuales inválidos"}), 400
+            except (ValueError, TypeError):
+                return jsonify({"error": "Parámetros manuales inválidos (deben ser números)"}), 400
 
         # Realizar predicción
         pred_maniana, pred_tarde, error = realizar_prediccion(fecha_str, temp_min, temp_max, clima_num)
         
         if error:
-            return jsonify({"error": error}), 500
+            status_code = 400 if "no entrenados" in error.lower() else 500
+            print(f"[API Backend] Error en predicción: {error} (Status: {status_code})")
+            return jsonify({"error": error}), status_code
 
         total_pred = 0
         if pred_maniana is not None and pred_tarde is not None:
@@ -439,7 +445,8 @@ def health_check():
     return jsonify({
         "status": "ok",
         "timestamp": datetime.datetime.now().isoformat(),
-        "version": "1.0.0"
+        "version": "1.0.0",
+        "env_key_set": bool(OPENWEATHERMAP_API_KEY and OPENWEATHERMAP_API_KEY != "TU_API_KEY_AQUI")
     }), 200
 
 if __name__ == '__main__':

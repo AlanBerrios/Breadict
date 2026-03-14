@@ -6,7 +6,8 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
-  ActivityIndicator
+  ActivityIndicator,
+  Image
 } from 'react-native';
 import { Card, Button, Title, Paragraph, Modal, Portal } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
@@ -91,6 +92,10 @@ const HomeScreen = () => {
   if (loading) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: isDarkMode ? '#121212' : '#F5F5F5' }]}>
+        <Image 
+          source={require('../../assets/icon.png')} 
+          style={{ width: 100, height: 100, marginBottom: 20, borderRadius: 20 }} 
+        />
         <ActivityIndicator size="large" color={isDarkMode ? '#81C784' : '#2E7D32'} />
         <Text style={[styles.loadingText, { color: isDarkMode ? '#AAAAAA' : '#666' }]}>Verificando conexión...</Text>
       </View>
