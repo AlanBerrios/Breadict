@@ -40,13 +40,20 @@ const HomeScreen = () => {
     try {
       setLoading(true);
       
-      // Verificar conexión con el servidor
-      await apiService.healthCheck();
-      setServerStatus('connected');
+      // Mostrar el logo un mínimo de 3 segundos
+      const minDelay = new Promise(resolve => setTimeout(resolve, 3000));
       
-      // Obtener estadísticas
-      const stats = await apiService.obtenerEstadisticas();
-      setEstadisticas(stats);
+      // Verificar conexión con el servidor
+      const connectionCheck = async () => {
+        await apiService.healthCheck();
+        setServerStatus('connected');
+        
+        // Obtener estadísticas
+        const stats = await apiService.obtenerEstadisticas();
+        setEstadisticas(stats);
+      };
+      
+      await Promise.all([minDelay, connectionCheck()]);
       
     } catch (error) {
       setServerStatus('error');

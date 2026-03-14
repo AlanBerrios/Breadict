@@ -369,9 +369,23 @@ def obtener_prediccion():
         pred_maniana, pred_tarde, error = realizar_prediccion(fecha_str, temp_min, temp_max, clima_num)
         
         if error:
-            status_code = 400 if "no entrenados" in error.lower() else 500
-            print(f"[API Backend] Error en predicción: {error} (Status: {status_code})")
-            return jsonify({"error": error}), status_code
+            # Si los modelos no están entrenados, igualmente retornar los datos del clima
+            if "no entrenados" in error.lower():
+                print(f"[API Backend] Modelos no entrenados, devolviendo solo clima.")
+                return jsonify({
+                    "fecha": fecha_str,
+                    "fuente_clima": fuente_clima,
+                    "clima_numero": clima_num,
+                    "clima_texto": MAPEO_CLIMA_NUMERO_A_TEXTO.get(clima_num, "desconocido"),
+                    "temperatura_minima": temp_min,
+                    "temperatura_maxima": temp_max,
+                    "prediccion_maniana_kg": None,
+                    "prediccion_tarde_kg": None,
+                    "total_prediccion_kg": 0,
+                    "aviso": "Registra al menos 2 días de ventas para activar las predicciones."
+                }), 200
+            print(f"[API Backend] Error en predicción: {error}")
+            return jsonify({"error": error}), 500
 
         total_pred = 0
         if pred_maniana is not None and pred_tarde is not None:
