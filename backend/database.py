@@ -1,32 +1,67 @@
-import sqlite3
 import os
+import sqlite3
+import traceback
+import psycopg2
+from psycopg2 import pool
 from datetime import datetime, date
 import pandas as pd
 
 class PanaderiaDB:
     def __init__(self, db_path="panaderia.db"):
         self.db_path = db_path
+        self.connection_string = os.getenv("DATABASE_URL")
+        self.is_postgres = self.connection_string is not None
+        
+        if self.is_postgres:
+            print("[DB Backend] Usando PostgreSQL (Supabase/Cloud)")
+        else:
+            print("[DB Backend] Usando SQLite (Local)")
+            
         self.init_database()
     
+    def get_connection(self):
+        """Retorna una conexión activa (Postgres o SQLite)"""
+        if self.is_postgres:
+            return psycopg2.connect(self.connection_string)
+        else:
+            return sqlite3.connect(self.db_path)
+
     def init_database(self):
-        """Inicializa la base de datos SQLite con la tabla necesaria"""
-        conn = sqlite3.connect(self.db_path)
+        """Inicializa la base de datos con la tabla necesaria"""
+        conn = self.get_connection()
         cursor = conn.cursor()
         
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS registros_panaderia (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                fecha DATE UNIQUE NOT NULL,
-                clima_promedio TEXT NOT NULL,
-                temperatura_minima REAL NOT NULL,
-                temperatura_maxima REAL NOT NULL,
-                pan_comprado_maniana INTEGER NOT NULL,
-                pan_comprado_tarde INTEGER NOT NULL,
-                pan_vendido_maniana INTEGER NOT NULL,
-                pan_vendido_tarde INTEGER NOT NULL,
-                creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
+        # Sintaxis compatible con ambos (Postgres usa SERIAL, SQLite AUTOINCREMENT)
+        if self.is_postgres:
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS registros_panaderia (
+                    id SERIAL PRIMARY KEY,
+                    fecha DATE UNIQUE NOT NULL,
+                    clima_promedio TEXT NOT NULL,
+                    temperatura_minima REAL NOT NULL,
+                    temperatura_maxima REAL NOT NULL,
+                    pan_comprado_maniana INTEGER NOT NULL,
+                    pan_comprado_tarde INTEGER NOT NULL,
+                    pan_vendido_maniana INTEGER NOT NULL,
+                    pan_vendido_tarde INTEGER NOT NULL,
+                    creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+        else:
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS registros_panaderia (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    fecha DATE UNIQUE NOT NULL,
+                    clima_promedio TEXT NOT NULL,
+                    temperatura_minima REAL NOT NULL,
+                    temperatura_maxima REAL NOT NULL,
+                    pan_comprado_maniana INTEGER NOT NULL,
+                    pan_comprado_tarde INTEGER NOT NULL,
+                    pan_vendido_maniana INTEGER NOT NULL,
+                    pan_vendido_tarde INTEGER NOT NULL,
+                    creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
         
         conn.commit()
         conn.close()
@@ -34,23 +69,40 @@ class PanaderiaDB:
     def insertar_registro(self, fecha, clima_promedio, temp_min, temp_max, 
                          pan_comp_man, pan_comp_tar, pan_vend_man, pan_vend_tar):
         """Inserta o actualiza un registro de panadería"""
-        conn = sqlite3.connect(self.db_path)
+        conn = self.get_connection()
         cursor = conn.cursor()
         
-        cursor.execute('''
-            INSERT OR REPLACE INTO registros_panaderia 
-            (fecha, clima_promedio, temperatura_minima, temperatura_maxima,
-             pan_comprado_maniana, pan_comprado_tarde, pan_vendido_maniana, pan_vendido_tarde)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (fecha, clima_promedio, temp_min, temp_max, 
-              pan_comp_man, pan_comp_tar, pan_vend_man, pan_vend_tar))
+        if self.is_postgres:
+            cursor.execute('''
+                INSERT INTO registros_panaderia 
+                (fecha, clima_promedio, temperatura_minima, temperatura_maxima,
+                 pan_comprado_maniana, pan_comprado_tarde, pan_vendido_maniana, pan_vendido_tarde)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (fecha) DO UPDATE SET
+                    clima_promedio = EXCLUDED.clima_promedio,
+                    temperatura_minima = EXCLUDED.temperatura_minima,
+                    temperatura_maxima = EXCLUDED.temperatura_maxima,
+                    pan_comprado_maniana = EXCLUDED.pan_comprado_maniana,
+                    pan_comprado_tarde = EXCLUDED.pan_comprado_tarde,
+                    pan_vendido_maniana = EXCLUDED.pan_vendido_maniana,
+                    pan_vendido_tarde = EXCLUDED.pan_vendido_tarde
+            ''', (fecha, clima_promedio, temp_min, temp_max, 
+                  pan_comp_man, pan_comp_tar, pan_vend_man, pan_vend_tar))
+        else:
+            cursor.execute('''
+                INSERT OR REPLACE INTO registros_panaderia 
+                (fecha, clima_promedio, temperatura_minima, temperatura_maxima,
+                 pan_comprado_maniana, pan_comprado_tarde, pan_vendido_maniana, pan_vendido_tarde)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (fecha, clima_promedio, temp_min, temp_max, 
+                  pan_comp_man, pan_comp_tar, pan_vend_man, pan_vend_tar))
         
         conn.commit()
         conn.close()
     
     def obtener_todos_los_datos(self):
         """Retorna todos los datos como DataFrame de pandas"""
-        conn = sqlite3.connect(self.db_path)
+        conn = self.get_connection()
         
         query = '''
             SELECT fecha, clima_promedio, temperatura_minima, temperatura_maxima,
@@ -66,13 +118,14 @@ class PanaderiaDB:
     
     def obtener_registro_fecha(self, fecha):
         """Obtiene un registro específico por fecha"""
-        conn = sqlite3.connect(self.db_path)
+        conn = self.get_connection()
         cursor = conn.cursor()
         
-        cursor.execute('''
+        ph = "%s" if self.is_postgres else "?"
+        cursor.execute(f'''
             SELECT fecha, clima_promedio, temperatura_minima, temperatura_maxima,
                    pan_comprado_maniana, pan_comprado_tarde, pan_vendido_maniana, pan_vendido_tarde
-            FROM registros_panaderia WHERE fecha = ?
+            FROM registros_panaderia WHERE fecha = {ph}
         ''', (fecha,))
         
         resultado = cursor.fetchone()
@@ -93,7 +146,7 @@ class PanaderiaDB:
     
     def contar_registros(self):
         """Cuenta cuántos registros hay en la base de datos"""
-        conn = sqlite3.connect(self.db_path)
+        conn = self.get_connection()
         cursor = conn.cursor()
         
         cursor.execute('SELECT COUNT(*) FROM registros_panaderia')
@@ -105,9 +158,10 @@ class PanaderiaDB:
     def migrar_csv_a_sqlite(self, csv_path):
         """Migra datos del CSV existente a SQLite"""
         if not os.path.exists(csv_path):
-            print(f"Archivo CSV {csv_path} no encontrado")
+            print(f"[DB Backend] CRITICAL: Archivo CSV {csv_path} no encontrado en {os.getcwd()}")
             return False
         
+        print(f"[DB Backend] Iniciando migración desde: {csv_path}")
         try:
             df = pd.read_csv(csv_path)
             
@@ -130,27 +184,25 @@ class PanaderiaDB:
             df['fecha'] = pd.to_datetime(df['fecha']).dt.strftime('%Y-%m-%d')
             
             # Insertar cada registro
-            conn = sqlite3.connect(self.db_path)
+            conn = self.get_connection()
             cursor = conn.cursor()
             
+            ph = "%s" if self.is_postgres else "?"
             for _, row in df.iterrows():
                 if pd.notna(row['fecha']) and pd.notna(row['clima_promedio']):
-                    cursor.execute('''
-                        INSERT OR REPLACE INTO registros_panaderia 
-                        (fecha, clima_promedio, temperatura_minima, temperatura_maxima,
-                         pan_comprado_maniana, pan_comprado_tarde, pan_vendido_maniana, pan_vendido_tarde)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                    ''', (row['fecha'], row['clima_promedio'], 
-                          row['temperatura_minima'], row['temperatura_maxima'],
-                          int(row['pan_comprado_maniana']), int(row['pan_comprado_tarde']),
-                          int(row['pan_vendido_maniana']), int(row['pan_vendido_tarde'])))
+                    self.insertar_registro(
+                        row['fecha'], row['clima_promedio'], 
+                        row['temperatura_minima'], row['temperatura_maxima'],
+                        int(row['pan_comprado_maniana']), int(row['pan_comprado_tarde']),
+                        int(row['pan_vendido_maniana']), int(row['pan_vendido_tarde'])
+                    )
             
-            conn.commit()
             conn.close()
             
-            print(f"Migrados {len(df)} registros del CSV a SQLite")
+            print(f"[DB Backend] Migrados {len(df)} registros del CSV a SQLite correctamente.")
             return True
             
         except Exception as e:
-            print(f"Error migrando CSV: {e}")
+            print(f"[DB Backend] ERROR migrando CSV: {e}")
+            traceback.print_exc()
             return False

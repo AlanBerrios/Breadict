@@ -47,29 +47,29 @@ const ConfiguracionScreen = () => {
     setTempLocation(location);
   }, [storeName, themeMode, autoPredict, limitMorning, limitAfternoon, location]);
 
-  const handleSave = async () => {
+  const saveSettings = async (showFeedback = true) => {
     try {
       if (!tempStoreName.trim()) {
-        Alert.alert('Error', 'El nombre de la panadería no puede estar vacío.');
-        return;
+        if (showFeedback) Alert.alert('Error', 'El nombre de la panadería no puede estar vacío.');
+        return false;
       }
       
       let lm = parseInt(tempLimitM);
       let la = parseInt(tempLimitA);
       
       if (isNaN(lm) || isNaN(la) || lm < 0 || lm > 23 || la < 0 || la > 23) {
-        Alert.alert('Error', 'Las horas límite deben ser números válidos entre 0 y 23.');
-        return;
+        if (showFeedback) Alert.alert('Error', 'Las horas límite deben ser números válidos entre 0 y 23.');
+        return false;
       }
       
       if (lm >= la) {
-        Alert.alert('Error', 'La hora de la mañana debe ser menor a la hora de la tarde.');
-        return;
+        if (showFeedback) Alert.alert('Error', 'La hora de la mañana debe ser menor a la hora de la tarde.');
+        return false;
       }
 
       if (!tempLocation) {
-        Alert.alert('Error', 'Debes configurar tu ubicación GPS.');
-        return;
+        if (showFeedback) Alert.alert('Error', 'Debes configurar tu ubicación GPS.');
+        return false;
       }
 
       await updateStoreName(tempStoreName);
@@ -78,13 +78,29 @@ const ConfiguracionScreen = () => {
       await updateLimits(lm, la);
       await updateLocation(tempLocation);
       
+      return true;
+    } catch (e) {
+      if (showFeedback) Alert.alert('Error', 'Ocurrió un problema guardando las preferencias.');
+      return false;
+    }
+  };
+
+  // Auto-save on blur (navigating away)
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('blur', () => {
+      saveSettings(false); // Silent save
+    });
+    return unsubscribe;
+  }, [navigation, tempStoreName, isDark, isAuto, tempLimitM, tempLimitA, tempLocation]);
+
+  const handleSave = async () => {
+    const success = await saveSettings(true);
+    if (success) {
       Alert.alert(
         'Guardado', 
         'Las preferencias se han guardado exitosamente.',
         [{ text: 'OK', onPress: () => navigation.goBack() }]
       );
-    } catch (e) {
-      Alert.alert('Error', 'Ocurrió un problema guardando las preferencias.');
     }
   };
 

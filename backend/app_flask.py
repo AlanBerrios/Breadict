@@ -67,11 +67,11 @@ def obtener_pronostico_api(fecha_target_str, lat=None, lon=None):
         
         # Siempre intentar usar forecast para tener la min/max global del dia
         if lat and lon:
-            url = f"http://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}&appid={OPENWEATHERMAP_API_KEY}&units=metric&lang=es"
-            print(f"[API Backend] URL construida (coords): http://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}&appid={masked_key}...")
+            url = f"https://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}&appid={OPENWEATHERMAP_API_KEY}&units=metric&lang=es"
+            print(f"[API Backend] URL construida (coords): https://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}&appid={masked_key}...")
         else:
-            url = f"http://api.openweathermap.org/data/2.5/forecast?q={CIUDAD_API}&appid={OPENWEATHERMAP_API_KEY}&units=metric&lang=es"
-            print(f"[API Backend] URL construida (ciudad): http://api.openweathermap.org/data/2.5/forecast?q={CIUDAD_API}&appid={masked_key}...")
+            url = f"https://api.openweathermap.org/data/2.5/forecast?q={CIUDAD_API}&appid={OPENWEATHERMAP_API_KEY}&units=metric&lang=es"
+            print(f"[API Backend] URL construida (ciudad): https://api.openweathermap.org/data/2.5/forecast?q={CIUDAD_API}&appid={masked_key}...")
 
         response = requests.get(url)
         response.raise_for_status()
@@ -89,9 +89,9 @@ def obtener_pronostico_api(fecha_target_str, lat=None, lon=None):
         # Si no hay pronosticos para "hoy" (ej: OWM corto el dia porque son 23:55), hacer fallback a /weather actual
         if not temps_min_dia and delta_dias == 0:
             if lat and lon:
-                url_current = f"http://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={OPENWEATHERMAP_API_KEY}&units=metric&lang=es"
+                url_current = f"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={OPENWEATHERMAP_API_KEY}&units=metric&lang=es"
             else:
-                url_current = f"http://api.openweathermap.org/data/2.5/weather?q={CIUDAD_API}&appid={OPENWEATHERMAP_API_KEY}&units=metric&lang=es"
+                url_current = f"https://api.openweathermap.org/data/2.5/weather?q={CIUDAD_API}&appid={OPENWEATHERMAP_API_KEY}&units=metric&lang=es"
             
             resp_cur = requests.get(url_current)
             resp_cur.raise_for_status()
@@ -253,18 +253,23 @@ CORS(app)  # Permitir peticiones desde la app móvil
 def inicializar():
     """Inicializa la base de datos y los modelos"""
     global db
+    print(f"[App Backend] Inicializando en: {os.getcwd()}")
     db = PanaderiaDB()
     
     # Migrar datos del CSV si existe
     csv_path = "datos_panaderia_kilos.csv"
     if os.path.exists(csv_path):
-        print("Migrando datos del CSV a SQLite...")
-        db.migrar_csv_a_sqlite(csv_path)
+        print(f"[App Backend] Detectado CSV de entrenamiento: {csv_path}")
+        exito = db.migrar_csv_a_sqlite(csv_path)
+        print(f"[App Backend] Resultado migración: {'Exitosa' if exito else 'Fallida'}")
+    else:
+        print(f"[App Backend] No se encontró CSV inicial en {os.getcwd()}")
     
     # Entrenar modelos iniciales
-    entrenar_modelos_globales()
+    status_entrenamiento = entrenar_modelos_globales()
+    print(f"[App Backend] Modelos entrenados al inicio: {'Sí' if status_entrenamiento else 'No (Faltan datos)'}")
 
-# Llamar a la inicialización manualmente (Flask 3.x ya no soporta before_first_request)
+# Llamar a la inicialización manualmente
 with app.app_context():
     inicializar()
 
@@ -446,7 +451,8 @@ def health_check():
         "status": "ok",
         "timestamp": datetime.datetime.now().isoformat(),
         "version": "1.0.0",
-        "env_key_set": bool(OPENWEATHERMAP_API_KEY and OPENWEATHERMAP_API_KEY != "TU_API_KEY_AQUI")
+        "env_key_set": bool(OPENWEATHERMAP_API_KEY and OPENWEATHERMAP_API_KEY != "TU_API_KEY_AQUI"),
+        "database_type": "PostgreSQL (Cloud)" if db and db.is_postgres else "SQLite (Local)"
     }), 200
 
 if __name__ == '__main__':

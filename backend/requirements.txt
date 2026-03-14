@@ -6,3 +6,4 @@ requests
 numpy
 python-dotenv
 gunicorn
+psycopg2-binary
