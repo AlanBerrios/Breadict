@@ -410,7 +410,7 @@ const ConfiguracionScreen = () => {
       <Card style={styles.card}>
         <Card.Content>
           <Title style={styles.cardTitle}>Acerca de Breadict</Title>
-          
+
           <View style={styles.aboutRow}>
             <Text style={styles.aboutLabel}>Versión:</Text>
             <Text style={styles.aboutValue}>2.1.0</Text>

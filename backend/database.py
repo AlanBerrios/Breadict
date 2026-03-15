@@ -213,7 +213,8 @@ class PanaderiaDB:
             
             conn.close()
             
-            print(f"[DB Backend] Migrados {len(df)} registros del CSV a SQLite correctamente.")
+            db_type = "PostgreSQL" if self.is_postgres else "SQLite"
+            print(f"[DB Backend] Migrados {len(df)} registros del CSV a {db_type} correctamente.")
             return True
             
         except Exception as e:

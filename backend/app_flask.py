@@ -269,6 +269,20 @@ with app.app_context():
 
 # --- Endpoints de la API ---
 
+@app.route('/', methods=['GET'])
+def index():
+    """Ruta raíz para verificar que el servidor está vivo"""
+    return jsonify({
+        "message": "🍞 Breadict API is Online",
+        "version": "2.1.0",
+        "status": "ready",
+        "endpoints": {
+            "health": "/api/health",
+            "predict": "/api/prediccion",
+            "stats": "/api/estadisticas"
+        }
+    }), 200
+
 @app.route('/api/registro', methods=['POST'])
 def registrar_datos():
     """Registra los datos reales de ventas del día"""
