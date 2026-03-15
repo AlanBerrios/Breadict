@@ -20,12 +20,13 @@ import AppFooter from '../components/AppFooter';
 
 const HomeScreen = () => {
   const navigation = useNavigation();
-  const { storeName, themeMode, location, hasSeenTutorial, updateHasSeenTutorial } = useSettings();
+  const { storeName, themeMode, location, hasSeenTutorial, updateHasSeenTutorial, serverStatus, setServerStatus } = useSettings();
   const [loading, setLoading] = useState(true);
+  const [bypassLoading, setBypassLoading] = useState(false);
   const [estadisticas, setEstadisticas] = useState(null);
-  const [serverStatus, setServerStatus] = useState('checking');
   const [weeklyData, setWeeklyData] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [showBypassButton, setShowBypassButton] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   
   // Tutorial State
@@ -41,6 +42,13 @@ const HomeScreen = () => {
     if (hasSeenTutorial === false) {
       setTutorialVisible(true);
     }
+
+    // Mostrar botón de bypass tras 3 segundos si sigue cargando
+    const bypassTimer = setTimeout(() => {
+      setShowBypassButton(true);
+    }, 3000);
+
+    return () => clearTimeout(bypassTimer);
   }, [hasSeenTutorial]);
 
   // Re-fetch stats every time the screen comes into focus (e.g. after registering)
@@ -97,6 +105,16 @@ const HomeScreen = () => {
     }
   };
 
+  const handleBypass = () => {
+    setBypassLoading(true);
+    // Iniciar animación aunque el servidor no responda
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 500,
+      useNativeDriver: true,
+    }).start();
+  };
+
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     fadeAnim.setValue(0);
@@ -132,15 +150,28 @@ const HomeScreen = () => {
     }
   };
 
-  if (loading) {
+  if (loading && !bypassLoading) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: isDarkMode ? '#121212' : '#F5F5F5' }]}>
         <Image 
           source={require('../../assets/icon.png')} 
-          style={{ width: 100, height: 100, marginBottom: 20, borderRadius: 20 }} 
+          style={{ width: 120, height: 120, marginBottom: 20, borderRadius: 25 }} 
         />
         <ActivityIndicator size="large" color={isDarkMode ? '#81C784' : '#2E7D32'} />
-        <Text style={[styles.loadingText, { color: isDarkMode ? '#AAAAAA' : '#666' }]}>Verificando conexión...</Text>
+        <Text style={[styles.loadingText, { color: isDarkMode ? '#AAAAAA' : '#666', marginTop: 20 }]}>
+          {serverStatus === 'error' ? 'Error al conectar' : 'Despertando servidor...'}
+        </Text>
+        
+        {showBypassButton && (
+          <Button 
+            mode="text" 
+            onPress={handleBypass}
+            textColor={isDarkMode ? '#81C784' : '#2E7D32'}
+            style={{ marginTop: 30 }}
+          >
+            Entrar a la app de todas formas
+          </Button>
+        )}
       </View>
     );
   }

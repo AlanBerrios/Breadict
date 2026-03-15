@@ -26,6 +26,54 @@ const LogoTitle = () => {
   );
 };
 
+const ConnectionBanner = () => {
+  const { serverStatus, themeMode } = useSettings();
+  const isDark = themeMode === 'dark';
+
+  if (serverStatus === 'connected') return null;
+
+  const getBannerConfig = () => {
+    switch (serverStatus) {
+      case 'checking':
+        return {
+          text: '📡 Despertando servidor... algunas funciones pueden tardar.',
+          color: isDark ? '#FFF9C4' : '#FFF9C4',
+          textColor: '#F57F17'
+        };
+      case 'error':
+        return {
+          text: '📡 Sin conexión al servidor. Reintentando...',
+          color: isDark ? '#FFEBEE' : '#FFEBEE',
+          textColor: '#C62828'
+        };
+      default: return null;
+    }
+  };
+
+  const config = getBannerConfig();
+  if (!config) return null;
+
+  return (
+    <View style={{ 
+      backgroundColor: config.color, 
+      paddingVertical: 8, 
+      paddingHorizontal: 15,
+      // alignItems: 'center',
+      borderBottomWidth: 1,
+      borderBottomColor: 'rgba(0,0,0,0.05)'
+    }}>
+      <Text style={{ 
+        color: config.textColor, 
+        fontSize: 12, 
+        fontWeight: 'bold',
+        textAlign: 'center'
+      }}>
+        {config.text}
+      </Text>
+    </View>
+  );
+};
+
 function AppNavigation() {
   const { themeMode } = useSettings();
   const isDark = themeMode === 'dark';
@@ -37,6 +85,7 @@ function AppNavigation() {
 
   return (
     <NavigationContainer>
+      <ConnectionBanner />
       <Stack.Navigator initialRouteName="Home">
         <Stack.Screen 
           name="Home" 

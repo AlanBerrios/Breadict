@@ -20,6 +20,9 @@ export const SettingsProvider = ({ children }) => {
   // Estado del tutorial de bienvenida
   const [hasSeenTutorial, setHasSeenTutorial] = useState(true); // Default true until loaded
   
+  // Estado de conexión global
+  const [serverStatus, setServerStatus] = useState('checking'); // 'checking' | 'connected' | 'error'
+  
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -116,6 +119,8 @@ export const SettingsProvider = ({ children }) => {
     updateLimits,
     updateLocation,
     updateHasSeenTutorial,
+    serverStatus,
+    setServerStatus,
     loading
   };
 
