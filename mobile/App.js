@@ -10,6 +10,7 @@ import HomeScreen from './src/screens/HomeScreen';
 import RegistroScreen from './src/screens/RegistroScreen';
 import PrediccionScreen from './src/screens/PrediccionScreen';
 import ConfiguracionScreen from './src/screens/ConfiguracionScreen';
+import AnaliticasScreen from './src/screens/AnaliticasScreen';
 
 const Stack = createStackNavigator();
 
@@ -67,6 +68,14 @@ function AppNavigation() {
           component={ConfiguracionScreen} 
           options={{ 
             title: 'Configuración',
+            ...headerOptions
+          }} 
+        />
+        <Stack.Screen 
+          name="Analiticas" 
+          component={AnaliticasScreen} 
+          options={{ 
+            title: 'Analíticas de IA',
             ...headerOptions
           }} 
         />

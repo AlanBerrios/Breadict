@@ -12,26 +12,26 @@ import { useNavigation } from '@react-navigation/native';
 import * as Location from 'expo-location';
 
 const ConfiguracionScreen = () => {
-  const { 
-    storeName, 
-    themeMode, 
-    autoPredict, 
-    limitMorning, 
+  const {
+    storeName,
+    themeMode,
+    autoPredict,
+    limitMorning,
     limitAfternoon,
     location,
-    updateStoreName, 
-    updateThemeMode, 
+    updateStoreName,
+    updateThemeMode,
     updateAutoPredict,
     updateLimits,
     updateLocation
   } = useSettings();
-  
+
   const navigation = useNavigation();
 
   const [tempStoreName, setTempStoreName] = useState(storeName);
   const [isDark, setIsDark] = useState(themeMode === 'dark');
   const [isAuto, setIsAuto] = useState(autoPredict);
-  
+
   const [tempLimitM, setTempLimitM] = useState(limitMorning ? limitMorning.toString() : '8');
   const [tempLimitA, setTempLimitA] = useState(limitAfternoon ? limitAfternoon.toString() : '14');
   const [tempLocation, setTempLocation] = useState(location);
@@ -53,15 +53,15 @@ const ConfiguracionScreen = () => {
         if (showFeedback) Alert.alert('Error', 'El nombre de la panadería no puede estar vacío.');
         return false;
       }
-      
+
       let lm = parseInt(tempLimitM);
       let la = parseInt(tempLimitA);
-      
+
       if (isNaN(lm) || isNaN(la) || lm < 0 || lm > 23 || la < 0 || la > 23) {
         if (showFeedback) Alert.alert('Error', 'Las horas límite deben ser números válidos entre 0 y 23.');
         return false;
       }
-      
+
       if (lm >= la) {
         if (showFeedback) Alert.alert('Error', 'La hora de la mañana debe ser menor a la hora de la tarde.');
         return false;
@@ -77,7 +77,7 @@ const ConfiguracionScreen = () => {
       await updateAutoPredict(isAuto);
       await updateLimits(lm, la);
       await updateLocation(tempLocation);
-      
+
       return true;
     } catch (e) {
       if (showFeedback) Alert.alert('Error', 'Ocurrió un problema guardando las preferencias.');
@@ -97,7 +97,7 @@ const ConfiguracionScreen = () => {
     const success = await saveSettings(true);
     if (success) {
       Alert.alert(
-        'Guardado', 
+        'Guardado',
         'Las preferencias se han guardado exitosamente.',
         [{ text: 'OK', onPress: () => navigation.goBack() }]
       );
@@ -114,7 +114,7 @@ const ConfiguracionScreen = () => {
         return;
       }
       let currentLoc = await Location.getCurrentPositionAsync({});
-      
+
       let reverse = await Location.reverseGeocodeAsync({
         latitude: currentLoc.coords.latitude,
         longitude: currentLoc.coords.longitude
@@ -129,11 +129,11 @@ const ConfiguracionScreen = () => {
         longitude: currentLoc.coords.longitude,
         city: cityName
       };
-      
+
       setTempLocation(newLoc);
       // Auto-save location immediately to context/storage
       await updateLocation(newLoc);
-      
+
       Alert.alert('Éxito', `Coordenadas GPS obtenidas: ${cityName}.`);
     } catch (e) {
       Alert.alert('Error', 'No se pudo obtener la ubicación GPS.');
@@ -219,7 +219,7 @@ const ConfiguracionScreen = () => {
       <Card style={styles.card}>
         <Card.Content>
           <Title style={styles.cardTitle}>Personalización</Title>
-          
+
           <TextInput
             label="Nombre de la Panadería/Almacén"
             value={tempStoreName}
@@ -227,8 +227,8 @@ const ConfiguracionScreen = () => {
             mode="outlined"
             style={styles.input}
             textColor={isDarkMode ? '#FFFFFF' : '#000000'}
-            theme={{ 
-              colors: { 
+            theme={{
+              colors: {
                 primary: isDarkMode ? '#81C784' : '#2E7D32',
                 placeholder: isDarkMode ? '#AAAAAA' : '#666666',
                 text: isDarkMode ? '#FFFFFF' : '#000000',
@@ -258,10 +258,10 @@ const ConfiguracionScreen = () => {
           <Text style={[styles.settingDescription, { marginBottom: 15 }]}>
             Para obtener el pronóstico exacto de tu local, permite el acceso a tu ubicación GPS.
           </Text>
-          
-          <Button 
-            icon="map-marker" 
-            mode="contained-tonal" 
+
+          <Button
+            icon="map-marker"
+            mode="contained-tonal"
             loading={fetchingLocation}
             onPress={handleGetLocation}
             buttonColor={isDarkMode ? '#388E3C' : '#E8F5E8'}
@@ -282,7 +282,7 @@ const ConfiguracionScreen = () => {
       <Card style={styles.card}>
         <Card.Content>
           <Title style={styles.cardTitle}>Automatización</Title>
-          
+
           <View style={isAuto ? styles.settingRow : styles.settingRowNoBorder}>
             <View style={styles.settingTextContainer}>
               <Text style={styles.settingTitle}>Predicción Automática</Text>
@@ -303,7 +303,7 @@ const ConfiguracionScreen = () => {
               <Text style={[styles.settingDescription, { marginBottom: 15 }]}>
                 Antes de la hora de la mañana, predecirá todo hoy. Pasando la hora de la tarde, predecirá para mañana.
               </Text>
-              
+
               <View style={styles.rowInputs}>
                 <TextInput
                   label="Límite Mañana (Ej: 8)"
@@ -313,14 +313,14 @@ const ConfiguracionScreen = () => {
                   keyboardType="numeric"
                   style={styles.halfInput}
                   textColor={isDarkMode ? '#FFFFFF' : '#000000'}
-                  theme={{ 
-                    colors: { 
+                  theme={{
+                    colors: {
                       primary: isDarkMode ? '#81C784' : '#2E7D32',
                       placeholder: isDarkMode ? '#AAAAAA' : '#666666',
                     }
                   }}
                 />
-                
+
                 <TextInput
                   label="Límite Tarde (Ej: 14)"
                   value={tempLimitA}
@@ -329,8 +329,8 @@ const ConfiguracionScreen = () => {
                   keyboardType="numeric"
                   style={styles.halfInput}
                   textColor={isDarkMode ? '#FFFFFF' : '#000000'}
-                  theme={{ 
-                    colors: { 
+                  theme={{
+                    colors: {
                       primary: isDarkMode ? '#81C784' : '#2E7D32',
                       placeholder: isDarkMode ? '#AAAAAA' : '#666666',
                     }

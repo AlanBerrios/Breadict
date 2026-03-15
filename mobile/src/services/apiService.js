@@ -66,6 +66,16 @@ class ApiService {
     }
   }
 
+  // Obtener todos los registros con predicciones para analíticas
+  async obtenerAnaliticas() {
+    try {
+      const response = await this.api.get(API_CONFIG.ENDPOINTS.ANALITICAS);
+      return response.data;
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
   // Manejar errores de la API
   handleError(error) {
     if (error.response) {

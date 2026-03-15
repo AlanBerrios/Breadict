@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import { Card, Button, Title, Paragraph, Modal, Portal } from 'react-native-pape
 import { useNavigation } from '@react-navigation/native';
 import apiService from '../services/apiService';
 import { useSettings } from '../context/SettingsContext';
+import { useFocusEffect } from '@react-navigation/native';
 
 const HomeScreen = () => {
   const navigation = useNavigation();
@@ -35,6 +36,21 @@ const HomeScreen = () => {
       setTutorialVisible(true);
     }
   }, [hasSeenTutorial]);
+
+  // Re-fetch stats every time the screen comes into focus (e.g. after registering)
+  useFocusEffect(
+    useCallback(() => {
+      if (!loading) {
+        const refresh = async () => {
+          try {
+            const stats = await apiService.obtenerEstadisticas();
+            setEstadisticas(stats);
+          } catch (e) { /* silent */ }
+        };
+        refresh();
+      }
+    }, [loading])
+  );
 
   const verificarConexion = async () => {
     try {
@@ -162,39 +178,24 @@ const HomeScreen = () => {
         </Card>
       )}
 
-      {/* Gráfica de Predicción vs Realidad */}
-      {estadisticas && estadisticas.historial_comparativo && estadisticas.historial_comparativo.length > 0 && (
+      {/* Botón Analíticas de IA */}
+      {estadisticas && estadisticas.total_registros > 0 && (
         <Card style={[styles.card, dynamicStyles.card]}>
           <Card.Content>
-            <Title style={dynamicStyles.text}>Efectividad de IA</Title>
-            <Paragraph style={[dynamicStyles.subText, { marginBottom: 15 }]}>Últimos 5 días (Kilos Totales)</Paragraph>
-            
-            <View style={styles.chartLegend}>
-               <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: isDarkMode ? '#81C784' : '#4CAF50' }]} /><Text style={dynamicStyles.subText}>Vendido</Text></View>
-               <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: isDarkMode ? '#64B5F6' : '#2196F3' }]} /><Text style={dynamicStyles.subText}>Predicho</Text></View>
-            </View>
-
-            {estadisticas.historial_comparativo.map((item, index) => {
-              const maxVal = Math.max(...estadisticas.historial_comparativo.map(h => Math.max(h.vendido, h.predicho)), 1);
-              const pctVendido = (item.vendido / maxVal) * 100;
-              const pctPredicho = (item.predicho / maxVal) * 100;
-              
-              return (
-                <View key={index} style={styles.chartRow}>
-                  <Text style={[styles.chartLabel, dynamicStyles.text]}>{item.fecha}</Text>
-                  <View style={[styles.barsContainer, { borderLeftColor: isDarkMode ? '#444' : '#ccc' }]}>
-                    <View style={styles.barWrapper}>
-                       <View style={[styles.bar, { width: `${pctVendido}%`, backgroundColor: isDarkMode ? '#81C784' : '#4CAF50' }]} />
-                        <Text style={[styles.barText, { color: isDarkMode ? '#aaa' : '#666' }]}>{item.vendido} kg</Text>
-                    </View>
-                    <View style={styles.barWrapper}>
-                       <View style={[styles.bar, { width: `${pctPredicho}%`, backgroundColor: isDarkMode ? '#64B5F6' : '#2196F3' }]} />
-                        <Text style={[styles.barText, { color: isDarkMode ? '#aaa' : '#666' }]}>{item.predicho} kg</Text>
-                    </View>
-                  </View>
-                </View>
-              )
-            })}
+            <Title style={dynamicStyles.text}>Analíticas de IA</Title>
+            <Paragraph style={dynamicStyles.subText}>
+              Explora todos tus registros con predicciones vs ventas reales en una línea de tiempo interactiva.
+            </Paragraph>
+            <Button
+              mode="contained"
+              icon="chart-timeline-variant"
+              onPress={() => navigation.navigate('Analiticas')}
+              buttonColor={isDarkMode ? '#1565C0' : '#1976D2'}
+              textColor="#FFF"
+              style={{ marginTop: 10 }}
+            >
+              Ver Analíticas
+            </Button>
           </Card.Content>
         </Card>
       )}

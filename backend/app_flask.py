@@ -63,7 +63,8 @@ def obtener_pronostico_api(fecha_target_str, lat=None, lon=None):
         hoy_dt = datetime.date.today()
         delta_dias = (fecha_target_dt - hoy_dt).days
 
-        if delta_dias < 0 or delta_dias >= 6: return "manual"
+        # Permitir día -1 para cubrir desfases de zona horaria (UTC vs local)
+        if delta_dias < -1 or delta_dias >= 6: return "manual"
         
         # Siempre intentar usar forecast para tener la min/max global del dia
         if lat and lon:
@@ -86,8 +87,8 @@ def obtener_pronostico_api(fecha_target_str, lat=None, lon=None):
                     descs_dia.append(item['weather'][0]['description'])
                     ids_dia.append(item['weather'][0]['id'])
 
-        # Si no hay pronosticos para "hoy" (ej: OWM corto el dia porque son 23:55), hacer fallback a /weather actual
-        if not temps_min_dia and delta_dias == 0:
+        # Si no hay pronosticos para "hoy" (ej: OWM corto el dia o desfase de zona horaria), hacer fallback a /weather actual
+        if not temps_min_dia and delta_dias <= 0:
             if lat and lon:
                 url_current = f"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={OPENWEATHERMAP_API_KEY}&units=metric&lang=es"
             else:
@@ -455,6 +456,54 @@ def obtener_estadisticas():
         
     except Exception as e:
         import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/analiticas', methods=['GET'])
+def obtener_analiticas():
+    """Retorna TODOS los registros con predicciones para la pantalla de análisis interactivo"""
+    try:
+        if db is None:
+            return jsonify({"registros": [], "total": 0}), 200
+        
+        df = db.obtener_todos_los_datos()
+        if df.empty:
+            return jsonify({"registros": [], "total": 0}), 200
+        
+        registros = []
+        df_sorted = df.sort_values(by='fecha', ascending=True)
+        
+        for _, row in df_sorted.iterrows():
+            vendido_man = int(row['pan_vendido_maniana'])
+            vendido_tar = int(row['pan_vendido_tarde'])
+            vendido_total = vendido_man + vendido_tar
+            comprado_total = int(row['pan_comprado_maniana']) + int(row['pan_comprado_tarde'])
+            
+            predicho_total = 0
+            try:
+                clima_num = MAPEO_CLIMA_TEXTO_A_NUMERO.get(str(row['clima_promedio']).lower(), 3)
+                p_man, p_tar, _ = realizar_prediccion(
+                    str(row['fecha']),
+                    float(row['temperatura_minima']),
+                    float(row['temperatura_maxima']),
+                    clima_num
+                )
+                predicho_total = (p_man or 0) + (p_tar or 0)
+            except Exception:
+                predicho_total = 0
+            
+            registros.append({
+                "fecha": str(row['fecha']),
+                "clima": str(row['clima_promedio']),
+                "temp_min": float(row['temperatura_minima']),
+                "temp_max": float(row['temperatura_maxima']),
+                "vendido": vendido_total,
+                "comprado": comprado_total,
+                "predicho": predicho_total
+            })
+        
+        return jsonify({"registros": registros, "total": len(registros)}), 200
+    except Exception as e:
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 

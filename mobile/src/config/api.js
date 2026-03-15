@@ -9,6 +9,7 @@ export const API_CONFIG = {
     REGISTRO: '/api/registro',
     PREDICCION: '/api/prediccion',
     ESTADISTICAS: '/api/estadisticas',
+    ANALITICAS: '/api/analiticas',
     HEALTH: '/api/health'
   }
 };
