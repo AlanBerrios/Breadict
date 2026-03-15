@@ -14,6 +14,7 @@ import { useNavigation } from '@react-navigation/native';
 import apiService from '../services/apiService';
 import { useSettings } from '../context/SettingsContext';
 import { useFocusEffect } from '@react-navigation/native';
+import AppFooter from '../components/AppFooter';
 
 const HomeScreen = () => {
   const navigation = useNavigation();
@@ -345,6 +346,8 @@ const HomeScreen = () => {
       >
         Verificar Conexión
       </Button>
+
+      <AppFooter isDarkMode={isDarkMode} />
 
       {/* Tutorial Modal */}
       <Portal>

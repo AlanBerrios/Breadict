@@ -5,11 +5,13 @@ import {
   StyleSheet,
   ScrollView,
   Alert,
+  Linking,
 } from 'react-native';
 import { Card, Button, Title, TextInput, Switch, Divider } from 'react-native-paper';
 import { useSettings } from '../context/SettingsContext';
 import { useNavigation } from '@react-navigation/native';
 import * as Location from 'expo-location';
+import AppFooter from '../components/AppFooter';
 
 const ConfiguracionScreen = () => {
   const {
@@ -211,7 +213,23 @@ const ConfiguracionScreen = () => {
     halfInput: {
       width: '48%',
       backgroundColor: isDarkMode ? '#2C2C2C' : '#FFFFFF',
-    }
+    },
+    aboutRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      paddingVertical: 6,
+      borderBottomWidth: 1,
+      borderBottomColor: isDarkMode ? '#2C2C2C' : '#F0F0F0',
+    },
+    aboutLabel: {
+      fontSize: 14,
+      fontWeight: 'bold',
+      color: isDarkMode ? '#AAAAAA' : '#666',
+    },
+    aboutValue: {
+      fontSize: 14,
+      color: isDarkMode ? '#FFFFFF' : '#333',
+    },
   });
 
   return (
@@ -352,6 +370,55 @@ const ConfiguracionScreen = () => {
           Guardar Cambios
         </Button>
       </View>
+
+      {/* Acerca de */}
+      <Card style={styles.card}>
+        <Card.Content>
+          <Title style={styles.cardTitle}>Acerca de Breadict</Title>
+          
+          <View style={styles.aboutRow}>
+            <Text style={styles.aboutLabel}>Versión:</Text>
+            <Text style={styles.aboutValue}>2.0.0</Text>
+          </View>
+          <View style={styles.aboutRow}>
+            <Text style={styles.aboutLabel}>Desarrollador:</Text>
+            <Text style={styles.aboutValue}>Alan Berrios Estay</Text>
+          </View>
+          <View style={styles.aboutRow}>
+            <Text style={styles.aboutLabel}>Frontend:</Text>
+            <Text style={styles.aboutValue}>React Native + Expo</Text>
+          </View>
+          <View style={styles.aboutRow}>
+            <Text style={styles.aboutLabel}>Backend:</Text>
+            <Text style={styles.aboutValue}>Python (Flask) + Scikit-learn</Text>
+          </View>
+          <View style={styles.aboutRow}>
+            <Text style={styles.aboutLabel}>Base de Datos:</Text>
+            <Text style={styles.aboutValue}>PostgreSQL (Supabase)</Text>
+          </View>
+          <View style={styles.aboutRow}>
+            <Text style={styles.aboutLabel}>API Clima:</Text>
+            <Text style={styles.aboutValue}>Open-Meteo (gratis)</Text>
+          </View>
+          <View style={styles.aboutRow}>
+            <Text style={styles.aboutLabel}>Hosting:</Text>
+            <Text style={styles.aboutValue}>Render (backend)</Text>
+          </View>
+
+          <Button
+            mode="outlined"
+            icon="github"
+            onPress={() => Linking.openURL('https://github.com/AlanBerrios/Breadict')}
+            style={{ marginTop: 15 }}
+            textColor={isDarkMode ? '#81C784' : '#2E7D32'}
+            theme={{ colors: { outline: isDarkMode ? '#81C784' : '#2E7D32' } }}
+          >
+            Ver en GitHub
+          </Button>
+        </Card.Content>
+      </Card>
+
+      <AppFooter isDarkMode={isDarkMode} />
     </ScrollView>
   );
 };

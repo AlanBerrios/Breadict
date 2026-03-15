@@ -11,6 +11,7 @@ import {
 import { Card, Button, Title } from 'react-native-paper';
 import apiService from '../services/apiService';
 import { useSettings } from '../context/SettingsContext';
+import AppFooter from '../components/AppFooter';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = SCREEN_WIDTH * 0.82;
@@ -210,6 +211,8 @@ const AnaliticasScreen = () => {
           </Text>
         )}
       </View>
+
+      <AppFooter isDarkMode={isDarkMode} />
     </View>
   );
 };

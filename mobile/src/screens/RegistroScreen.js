@@ -14,6 +14,7 @@ import apiService from '../services/apiService';
 import { CLIMA_OPTIONS } from '../config/api';
 import { format, addDays, subDays, parseISO } from 'date-fns';
 import { useSettings } from '../context/SettingsContext';
+import AppFooter from '../components/AppFooter';
 
 const RegistroScreen = () => {
   const navigation = useNavigation();
@@ -441,6 +442,8 @@ const RegistroScreen = () => {
           Cancelar
         </Button>
       </View>
+
+      <AppFooter isDarkMode={isDarkMode} />
     </ScrollView>
   );
 };
