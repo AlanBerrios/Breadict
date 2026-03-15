@@ -439,6 +439,10 @@ const ConfiguracionScreen = () => {
             <Text style={styles.aboutLabel}>Hosting:</Text>
             <Text style={styles.aboutValue}>Render (backend)</Text>
           </View>
+          <View style={styles.aboutRow}>
+            <Text style={styles.aboutLabel}>API URL:</Text>
+            <Text style={[styles.aboutValue, { fontSize: 10 }]}>https://breadict.onrender.com</Text>
+          </View>
 
           <Button
             mode="outlined"
