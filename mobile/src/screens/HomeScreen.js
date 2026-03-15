@@ -21,6 +21,7 @@ const HomeScreen = () => {
   const [loading, setLoading] = useState(true);
   const [estadisticas, setEstadisticas] = useState(null);
   const [serverStatus, setServerStatus] = useState('checking');
+  const [weeklyData, setWeeklyData] = useState([]);
   
   // Tutorial State
   const [tutorialVisible, setTutorialVisible] = useState(false);
@@ -45,6 +46,12 @@ const HomeScreen = () => {
           try {
             const stats = await apiService.obtenerEstadisticas();
             setEstadisticas(stats);
+            // Fetch weekly data
+            const analytics = await apiService.obtenerAnaliticas();
+            if (analytics.registros) {
+              const last7 = analytics.registros.slice(-7);
+              setWeeklyData(last7);
+            }
           } catch (e) { /* silent */ }
         };
         refresh();
@@ -178,6 +185,64 @@ const HomeScreen = () => {
         </Card>
       )}
 
+      {/* Resumen Semanal */}
+      {weeklyData.length > 0 && (
+        <Card style={[styles.card, dynamicStyles.card]}>
+          <Card.Content>
+            <Title style={dynamicStyles.text}>📈 Resumen Semanal</Title>
+            <Text style={[dynamicStyles.subText, { marginBottom: 12 }]}>
+              Últimos {weeklyData.length} registros
+            </Text>
+            {(() => {
+              const maxVal = Math.max(...weeklyData.map(d => Math.max(d.vendido || 0, d.predicho || 0)), 1);
+              const totalVendido = weeklyData.reduce((s, d) => s + (d.vendido || 0), 0);
+              const totalPredicho = weeklyData.reduce((s, d) => s + (d.predicho || 0), 0);
+              const precision = totalPredicho > 0 ? Math.max(0, 100 - Math.abs((totalVendido - totalPredicho) / totalPredicho * 100)).toFixed(0) : '--';
+              const diasSemana = ['D', 'L', 'M', 'X', 'J', 'V', 'S'];
+              return (
+                <>
+                  <View style={styles.weekChart}>
+                    {weeklyData.map((d, i) => {
+                      const parts = d.fecha?.split('-') || [];
+                      const dateObj = parts.length === 3 ? new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2])) : new Date();
+                      const dayLabel = diasSemana[dateObj.getDay()];
+                      return (
+                        <View key={i} style={styles.weekDay}>
+                          <View style={styles.weekBarsRow}>
+                            <View style={[styles.weekBar, {
+                              height: Math.max(4, (d.vendido || 0) / maxVal * 60),
+                              backgroundColor: isDarkMode ? '#81C784' : '#4CAF50'
+                            }]} />
+                            <View style={[styles.weekBar, {
+                              height: Math.max(4, (d.predicho || 0) / maxVal * 60),
+                              backgroundColor: isDarkMode ? '#64B5F6' : '#2196F3'
+                            }]} />
+                          </View>
+                          <Text style={[styles.weekDayLabel, { color: isDarkMode ? '#888' : '#999' }]}>{dayLabel}</Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+                  <View style={styles.weekLegend}>
+                    <View style={styles.legendItem}>
+                      <View style={[styles.legendDot, { backgroundColor: isDarkMode ? '#81C784' : '#4CAF50' }]} />
+                      <Text style={[{ fontSize: 12 }, dynamicStyles.subText]}>Vendido</Text>
+                    </View>
+                    <View style={styles.legendItem}>
+                      <View style={[styles.legendDot, { backgroundColor: isDarkMode ? '#64B5F6' : '#2196F3' }]} />
+                      <Text style={[{ fontSize: 12 }, dynamicStyles.subText]}>Predicho</Text>
+                    </View>
+                    <Text style={[{ fontSize: 12, fontWeight: 'bold' }, { color: isDarkMode ? '#FFB74D' : '#E65100' }]}>
+                      🎯 Precisión: {precision}%
+                    </Text>
+                  </View>
+                </>
+              );
+            })()}
+          </Card.Content>
+        </Card>
+      )}
+
       {/* Botón Analíticas de IA */}
       {estadisticas && estadisticas.total_registros > 0 && (
         <Card style={[styles.card, dynamicStyles.card]}>
@@ -200,29 +265,58 @@ const HomeScreen = () => {
         </Card>
       )}
 
-      {/* Botones de Acción */}
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity
-          style={[styles.button, { backgroundColor: isDarkMode ? '#388E3C' : '#2E7D32' }]}
-          onPress={() => navigation.navigate('Prediccion')}
-        >
-          <Text style={styles.buttonText}>📊 Ver Predicción</Text>
-        </TouchableOpacity>
+      {/* Botones de Acción - Card Style */}
+      <Card style={[styles.card, dynamicStyles.card]}>
+        <Card.Content>
+          <Title style={dynamicStyles.text}>📊 Predicción de Compras</Title>
+          <Paragraph style={dynamicStyles.subText}>
+            Consulta cuánto pan comprar hoy o mañana según el clima y tu historial.
+          </Paragraph>
+          <Button
+            mode="contained"
+            icon="crystal-ball"
+            onPress={() => navigation.navigate('Prediccion')}
+            buttonColor={isDarkMode ? '#388E3C' : '#2E7D32'}
+            textColor="#FFF"
+            style={{ marginTop: 10 }}
+          >
+            Ver Predicción
+          </Button>
+        </Card.Content>
+      </Card>
 
-        <TouchableOpacity
-          style={[styles.button, { backgroundColor: isDarkMode ? '#388E3C' : '#2E7D32' }]}
-          onPress={() => navigation.navigate('Registro')}
-        >
-          <Text style={styles.buttonText}>📝 Registrar Ventas</Text>
-        </TouchableOpacity>
+      <Card style={[styles.card, dynamicStyles.card]}>
+        <Card.Content>
+          <Title style={dynamicStyles.text}>📝 Registrar Ventas</Title>
+          <Paragraph style={dynamicStyles.subText}>
+            Registra las ventas del día para mejorar la precisión de las predicciones.
+          </Paragraph>
+          <Button
+            mode="contained"
+            icon="pencil-plus"
+            onPress={() => navigation.navigate('Registro')}
+            buttonColor={isDarkMode ? '#388E3C' : '#2E7D32'}
+            textColor="#FFF"
+            style={{ marginTop: 10 }}
+          >
+            Registrar Ventas
+          </Button>
+        </Card.Content>
+      </Card>
 
-        <TouchableOpacity
-          style={[styles.button, { backgroundColor: isDarkMode ? '#424242' : '#616161' }]}
-          onPress={() => navigation.navigate('Configuracion')}
-        >
-          <Text style={styles.buttonText}>⚙️ Configuración</Text>
-        </TouchableOpacity>
-      </View>
+      <Card style={[styles.card, dynamicStyles.card]}>
+        <Card.Content>
+          <Button
+            mode="outlined"
+            icon="cog"
+            onPress={() => navigation.navigate('Configuracion')}
+            textColor={isDarkMode ? '#AAAAAA' : '#616161'}
+            theme={{ colors: { outline: isDarkMode ? '#555' : '#CCC' } }}
+          >
+            Configuración
+          </Button>
+        </Card.Content>
+      </Card>
 
       {/* Información Adicional */}
       <Card style={[styles.card, dynamicStyles.card]}>
@@ -397,6 +491,16 @@ const styles = StyleSheet.create({
   barWrapper: { flexDirection: 'row', alignItems: 'center', marginVertical: 3 },
   bar: { height: 14, borderRadius: 7, minWidth: 5 },
   barText: { fontSize: 11, marginLeft: 6, fontWeight: 'bold' },
+  predictionLabel: { fontSize: 16, fontWeight: 'bold' },
+  predictionValue: { fontSize: 20, fontWeight: 'bold' },
+  weekChart: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'flex-end', height: 80, marginBottom: 10 },
+  weekDay: { alignItems: 'center', flex: 1 },
+  weekBarsRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 2 },
+  weekBar: { width: 8, borderRadius: 4 },
+  weekDayLabel: { fontSize: 11, marginTop: 4, fontWeight: 'bold' },
+  weekLegend: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 15 },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  legendDot: { width: 8, height: 8, borderRadius: 4 },
 });
 
 export default HomeScreen;

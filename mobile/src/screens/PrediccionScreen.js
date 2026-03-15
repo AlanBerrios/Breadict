@@ -5,13 +5,14 @@ import {
   StyleSheet,
   ScrollView,
   Alert,
-  ActivityIndicator
+  ActivityIndicator,
+  TouchableOpacity
 } from 'react-native';
 import { Card, Button, Title, TextInput, HelperText, Chip } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import apiService from '../services/apiService';
 import { CLIMA_OPTIONS } from '../config/api';
-import { format, addDays } from 'date-fns';
+import { format, addDays, subDays, parseISO } from 'date-fns';
 import { useSettings } from '../context/SettingsContext';
 
 const PrediccionScreen = () => {
@@ -59,6 +60,35 @@ const PrediccionScreen = () => {
       setAutoFetched(true);
     }
   }, [autoPredict, limitMorning, limitAfternoon]);
+
+  const formatFecha = (fechaStr) => {
+    try {
+      const parts = fechaStr.split('-');
+      const dia = parts[2];
+      const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+      const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+      const dateObj = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+      const diaSemana = diasSemana[dateObj.getDay()];
+      const mes = meses[parseInt(parts[1]) - 1];
+      return `${diaSemana} ${dia} ${mes}`;
+    } catch { return fechaStr; }
+  };
+
+  const getDateLabel = (fechaStr) => {
+    const hoy = format(new Date(), 'yyyy-MM-dd');
+    const manana = format(addDays(new Date(), 1), 'yyyy-MM-dd');
+    if (fechaStr === hoy) return '(Hoy)';
+    if (fechaStr === manana) return '(Mañana)';
+    return '';
+  };
+
+  const changeDate = (direction) => {
+    const currentDate = parseISO(formData.fecha);
+    const newDate = direction === 'next' ? addDays(currentDate, 1) : subDays(currentDate, 1);
+    const newFechaStr = format(newDate, 'yyyy-MM-dd');
+    setFormData(prev => ({ ...prev, fecha: newFechaStr }));
+    setPrediccion(null);
+  };
 
   // Actualizar campo del formulario
   const updateField = (field, value) => {
@@ -169,15 +199,35 @@ const PrediccionScreen = () => {
         <Card.Content>
           <Title style={styles.cardTitle}>Configurar Predicción</Title>
           
-          <TextInput
-            label="Fecha"
-            value={formData.fecha}
-            onChangeText={(value) => updateField('fecha', value)}
-            mode="outlined"
-            style={[styles.input, dynamicStyles.input]}
-            textColor={dynamicStyles.text.color}
-            theme={{ colors: { primary: isDarkMode ? '#81C784' : '#2E7D32', placeholder: dynamicStyles.subText.color }}}
-          />
+          <View style={styles.dateRow}>
+            <TouchableOpacity
+              style={[styles.dateArrow, { backgroundColor: isDarkMode ? '#388E3C' : '#E8F5E8' }]}
+              onPress={() => changeDate('prev')}
+            >
+              <Text style={[styles.dateArrowText, { color: isDarkMode ? '#FFF' : '#2E7D32' }]}>◀</Text>
+            </TouchableOpacity>
+            <View style={[styles.dateDisplay, { backgroundColor: isDarkMode ? '#2C2C2C' : '#F5F5F5' }]}>
+              <Text style={[styles.dateText, { color: isDarkMode ? '#FFFFFF' : '#333333' }]}>
+                📅 {formatFecha(formData.fecha)}
+              </Text>
+              {getDateLabel(formData.fecha) !== '' && (
+                <Text style={[styles.dateHint, { color: isDarkMode ? '#81C784' : '#2E7D32' }]}>
+                  {getDateLabel(formData.fecha)}
+                </Text>
+              )}
+            </View>
+            <TouchableOpacity
+              style={[styles.dateArrow, { backgroundColor: isDarkMode ? '#388E3C' : '#E8F5E8' }]}
+              onPress={() => changeDate('next')}
+            >
+              <Text style={[styles.dateArrowText, { color: isDarkMode ? '#FFF' : '#2E7D32' }]}>▶</Text>
+            </TouchableOpacity>
+          </View>
+          {location && location.city && (
+            <Text style={[styles.locationText, { color: isDarkMode ? '#AAAAAA' : '#888' }]}>
+              📍 {location.city}
+            </Text>
+          )}
           <HelperText type="error" visible={!!errors.fecha}>{errors.fecha}</HelperText>
 
           {/* Toggle para datos manuales */}
@@ -262,8 +312,16 @@ const PrediccionScreen = () => {
             
             <View style={styles.resultRow}>
               <Text style={[styles.resultLabel, { color: isDarkMode ? '#E0E0E0' : '#333' }]}>Fecha:</Text>
-              <Text style={[styles.resultValue, { color: isDarkMode ? '#FFF' : '#333' }]}>{prediccion.fecha}</Text>
+              <Text style={[styles.resultValue, { color: isDarkMode ? '#FFF' : '#333' }]}>
+                {formatFecha(prediccion.fecha)} {getDateLabel(prediccion.fecha)}
+              </Text>
             </View>
+            {location && location.city && (
+              <View style={styles.resultRow}>
+                <Text style={[styles.resultLabel, { color: isDarkMode ? '#E0E0E0' : '#333' }]}>Ubicación:</Text>
+                <Text style={[styles.resultValue, { color: isDarkMode ? '#FFF' : '#333' }]}>📍 {location.city}</Text>
+              </View>
+            )}
 
             <View style={styles.resultRow}>
               <Text style={[styles.resultLabel, { color: isDarkMode ? '#E0E0E0' : '#333' }]}>Fuente del Clima:</Text>
@@ -364,6 +422,13 @@ const styles = StyleSheet.create({
   clearButton: { borderWidth: 1 },
   toggleContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginVertical: 15 },
   toggleLabel: { fontSize: 16, fontWeight: 'bold', flex: 1 },
+  dateRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 },
+  dateArrow: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center', elevation: 2 },
+  dateArrowText: { fontSize: 18, fontWeight: 'bold' },
+  dateDisplay: { flex: 1, marginHorizontal: 10, paddingVertical: 12, borderRadius: 10, alignItems: 'center' },
+  dateText: { fontSize: 17, fontWeight: 'bold' },
+  dateHint: { fontSize: 13, fontWeight: 'bold', marginTop: 2 },
+  locationText: { textAlign: 'center', fontSize: 13, marginBottom: 5, marginTop: -2 },
 });
 
 export default PrediccionScreen;

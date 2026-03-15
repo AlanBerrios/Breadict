@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -38,6 +38,11 @@ const RegistroScreen = () => {
 
   // Estado de errores
   const [errors, setErrors] = useState({});
+
+  // Auto-fetch clima al montar
+  useEffect(() => {
+    handleAutoClima(true);
+  }, []);
 
   // Actualizar campo del formulario
   const updateField = (field, value) => {
@@ -89,11 +94,45 @@ const RegistroScreen = () => {
       temperatura_minima: '',
       temperatura_maxima: '',
     }));
-    setShowWeatherForm(true); // Reset weather form when date changes
+    setShowWeatherForm(true);
+    // Auto-fetch weather for new date
+    setTimeout(() => handleAutoClimaForDate(newFechaStr), 100);
+  };
+
+  // Auto-fetch for a specific date (called by changeDate)
+  const handleAutoClimaForDate = async (fechaStr) => {
+    setFetchingWeather(true);
+    try {
+      const response = await apiService.obtenerPrediccion(fechaStr, location, null);
+      let climaVal = '';
+      let tempMin = null;
+      let tempMax = null;
+      
+      if (response.clima_texto) climaVal = response.clima_texto.toLowerCase();
+      if (response.temperatura_minima != null) tempMin = response.temperatura_minima;
+      if (response.temperatura_maxima != null) tempMax = response.temperatura_maxima;
+      
+      if (climaVal && tempMin != null) {
+        setFormData(prev => ({
+          ...prev,
+          fecha: fechaStr,
+          clima_promedio: climaVal,
+          temperatura_minima: String(tempMin),
+          temperatura_maxima: String(tempMax),
+        }));
+        setShowWeatherForm(false);
+      } else {
+        setShowWeatherForm(true);
+      }
+    } catch (e) {
+      setShowWeatherForm(true);
+    } finally {
+      setFetchingWeather(false);
+    }
   };
 
   // Auto-completar Clima
-  const handleAutoClima = async () => {
+  const handleAutoClima = async (silent = false) => {
     setFetchingWeather(true);
     try {
       // Pedimos predicción al servidor sin datos manuales para forzar lectura API
@@ -140,7 +179,7 @@ const RegistroScreen = () => {
           'El clima automático solo está disponible para hoy y los próximos 5 días. Para fechas pasadas, ingresa el clima manualmente.'
         );
       } else {
-        Alert.alert('Error API de Clima', 'No se pudo obtener el clima automático. Por favor, ingrésalo manualmente.');
+        if (!silent) Alert.alert('Error API de Clima', 'No se pudo obtener el clima automático. Por favor, ingrésalo manualmente.');
       }
       setShowWeatherForm(true);
     } finally {
@@ -316,68 +355,67 @@ const RegistroScreen = () => {
         </Card.Content>
       </Card>
 
-      {/* Datos de Compras */}
+      {/* Datos Mañana y Tarde - Side by Side */}
       <Card style={[styles.card, dynamicStyles.card]}>
         <Card.Content>
-          <Title style={styles.cardTitle}>Pan Comprado (kg)</Title>
-          <View style={styles.rowInputs}>
-            <TextInput
-              label="Mañana (kg)"
-              value={formData.pan_comprado_maniana}
-              onChangeText={(value) => updateField('pan_comprado_maniana', value)}
-              mode="outlined"
-              style={[styles.halfInput, dynamicStyles.input]}
-              keyboardType="numeric"
-              textColor={dynamicStyles.text.color}
-              theme={{ colors: { primary: isDarkMode ? '#81C784' : '#2E7D32', placeholder: dynamicStyles.subText.color }}}
-            />
-            <TextInput
-              label="Tarde (kg)"
-              value={formData.pan_comprado_tarde}
-              onChangeText={(value) => updateField('pan_comprado_tarde', value)}
-              mode="outlined"
-              style={[styles.halfInput, dynamicStyles.input]}
-              keyboardType="numeric"
-              textColor={dynamicStyles.text.color}
-              theme={{ colors: { primary: isDarkMode ? '#81C784' : '#2E7D32', placeholder: dynamicStyles.subText.color }}}
-            />
-          </View>
-          <View style={{flexDirection: 'row', justifyContent: 'space-between'}}>
-            <HelperText type="error" visible={!!errors.pan_comprado_maniana} style={{width: '48%'}}>{errors.pan_comprado_maniana}</HelperText>
-            <HelperText type="error" visible={!!errors.pan_comprado_tarde} style={{width: '48%'}}>{errors.pan_comprado_tarde}</HelperText>
-          </View>
-        </Card.Content>
-      </Card>
+          <Title style={styles.cardTitle}>Registrar Kilos</Title>
+          <View style={styles.columnsContainer}>
+            {/* Columna Mañana */}
+            <View style={styles.column}>
+              <Text style={[styles.columnTitle, { color: isDarkMode ? '#81C784' : '#2E7D32' }]}>☀️ Mañana</Text>
+              <TextInput
+                label="Comprado (kg)"
+                value={formData.pan_comprado_maniana}
+                onChangeText={(value) => updateField('pan_comprado_maniana', value)}
+                mode="outlined"
+                style={[styles.columnInput, dynamicStyles.input]}
+                keyboardType="numeric"
+                textColor={dynamicStyles.text.color}
+                theme={{ colors: { primary: isDarkMode ? '#81C784' : '#2E7D32', placeholder: dynamicStyles.subText.color }}}
+              />
+              <HelperText type="error" visible={!!errors.pan_comprado_maniana}>{errors.pan_comprado_maniana}</HelperText>
+              <TextInput
+                label="Vendido (kg)"
+                value={formData.pan_vendido_maniana}
+                onChangeText={(value) => updateField('pan_vendido_maniana', value)}
+                mode="outlined"
+                style={[styles.columnInput, dynamicStyles.input]}
+                keyboardType="numeric"
+                textColor={dynamicStyles.text.color}
+                theme={{ colors: { primary: isDarkMode ? '#81C784' : '#2E7D32', placeholder: dynamicStyles.subText.color }}}
+              />
+              <HelperText type="error" visible={!!errors.pan_vendido_maniana}>{errors.pan_vendido_maniana}</HelperText>
+            </View>
 
-      {/* Datos de Ventas */}
-      <Card style={[styles.card, dynamicStyles.card]}>
-        <Card.Content>
-          <Title style={styles.cardTitle}>Pan Vendido (kg)</Title>
-          <View style={styles.rowInputs}>
-            <TextInput
-              label="Mañana (kg)"
-              value={formData.pan_vendido_maniana}
-              onChangeText={(value) => updateField('pan_vendido_maniana', value)}
-              mode="outlined"
-              style={[styles.halfInput, dynamicStyles.input]}
-              keyboardType="numeric"
-              textColor={dynamicStyles.text.color}
-              theme={{ colors: { primary: isDarkMode ? '#81C784' : '#2E7D32', placeholder: dynamicStyles.subText.color }}}
-            />
-            <TextInput
-              label="Tarde (kg)"
-              value={formData.pan_vendido_tarde}
-              onChangeText={(value) => updateField('pan_vendido_tarde', value)}
-              mode="outlined"
-              style={[styles.halfInput, dynamicStyles.input]}
-              keyboardType="numeric"
-              textColor={dynamicStyles.text.color}
-              theme={{ colors: { primary: isDarkMode ? '#81C784' : '#2E7D32', placeholder: dynamicStyles.subText.color }}}
-            />
-          </View>
-          <View style={{flexDirection: 'row', justifyContent: 'space-between'}}>
-            <HelperText type="error" visible={!!errors.pan_vendido_maniana} style={{width: '48%'}}>{errors.pan_vendido_maniana}</HelperText>
-            <HelperText type="error" visible={!!errors.pan_vendido_tarde} style={{width: '48%'}}>{errors.pan_vendido_tarde}</HelperText>
+            {/* Separador */}
+            <View style={[styles.columnSeparator, { backgroundColor: isDarkMode ? '#333' : '#E0E0E0' }]} />
+
+            {/* Columna Tarde */}
+            <View style={styles.column}>
+              <Text style={[styles.columnTitle, { color: isDarkMode ? '#FFB74D' : '#E65100' }]}>🌙 Tarde</Text>
+              <TextInput
+                label="Comprado (kg)"
+                value={formData.pan_comprado_tarde}
+                onChangeText={(value) => updateField('pan_comprado_tarde', value)}
+                mode="outlined"
+                style={[styles.columnInput, dynamicStyles.input]}
+                keyboardType="numeric"
+                textColor={dynamicStyles.text.color}
+                theme={{ colors: { primary: isDarkMode ? '#FFB74D' : '#E65100', placeholder: dynamicStyles.subText.color }}}
+              />
+              <HelperText type="error" visible={!!errors.pan_comprado_tarde}>{errors.pan_comprado_tarde}</HelperText>
+              <TextInput
+                label="Vendido (kg)"
+                value={formData.pan_vendido_tarde}
+                onChangeText={(value) => updateField('pan_vendido_tarde', value)}
+                mode="outlined"
+                style={[styles.columnInput, dynamicStyles.input]}
+                keyboardType="numeric"
+                textColor={dynamicStyles.text.color}
+                theme={{ colors: { primary: isDarkMode ? '#FFB74D' : '#E65100', placeholder: dynamicStyles.subText.color }}}
+              />
+              <HelperText type="error" visible={!!errors.pan_vendido_tarde}>{errors.pan_vendido_tarde}</HelperText>
+            </View>
           </View>
         </Card.Content>
       </Card>
@@ -424,30 +462,17 @@ const styles = StyleSheet.create({
   summaryText: { fontSize: 16, fontWeight: 'bold', marginBottom: 5 },
   rowInputs: { flexDirection: 'row', justifyContent: 'space-between' },
   halfInput: { width: '48%', marginBottom: 5 },
-  dateRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 5,
-  },
-  dateArrow: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 2,
-  },
+  dateRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 },
+  dateArrow: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center', elevation: 2 },
   dateArrowText: { fontSize: 18, fontWeight: 'bold' },
-  dateDisplay: {
-    flex: 1,
-    marginHorizontal: 10,
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
+  dateDisplay: { flex: 1, marginHorizontal: 10, paddingVertical: 12, borderRadius: 10, alignItems: 'center' },
   dateText: { fontSize: 17, fontWeight: 'bold' },
   dateHint: { fontSize: 12, marginTop: 2 },
+  columnsContainer: { flexDirection: 'row', alignItems: 'flex-start' },
+  column: { flex: 1 },
+  columnSeparator: { width: 1, alignSelf: 'stretch', marginHorizontal: 8 },
+  columnTitle: { fontSize: 16, fontWeight: 'bold', textAlign: 'center', marginBottom: 10 },
+  columnInput: { marginBottom: 0 },
 });
 
 export default RegistroScreen;
