@@ -10,10 +10,24 @@ class PanaderiaDB:
     def __init__(self, db_path="panaderia.db"):
         self.db_path = db_path
         self.connection_string = os.getenv("DATABASE_URL")
-        self.is_postgres = self.connection_string is not None
+        self.is_postgres = False
         
-        if self.is_postgres:
-            print("[DB Backend] Usando PostgreSQL (Supabase/Cloud)")
+        if self.connection_string:
+            # Asegurar que tenga sslmode para Supabase
+            if "sslmode" not in self.connection_string:
+                sep = "&" if "?" in self.connection_string else "?"
+                self.connection_string += f"{sep}sslmode=require"
+            
+            # Intentar conectar a Postgres
+            try:
+                test_conn = psycopg2.connect(self.connection_string)
+                test_conn.close()
+                self.is_postgres = True
+                print("[DB Backend] ✅ Conexión a PostgreSQL (Supabase/Cloud) exitosa")
+            except Exception as e:
+                print(f"[DB Backend] ⚠️ No se pudo conectar a PostgreSQL: {e}")
+                print("[DB Backend] Usando SQLite (Local) como respaldo")
+                self.is_postgres = False
         else:
             print("[DB Backend] Usando SQLite (Local)")
             
