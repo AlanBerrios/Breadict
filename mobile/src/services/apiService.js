@@ -76,17 +76,29 @@ class ApiService {
     }
   }
 
+  // Verificar si ya existe un registro para una fecha
+  async checkFechaExiste(fecha) {
+    try {
+      const response = await this.api.get(API_CONFIG.ENDPOINTS.REGISTRO_EXISTE, { params: { fecha } });
+      return response.data;
+    } catch (error) {
+      return { exists: false };
+    }
+  }
+
+  // Obtener URL de exportación CSV
+  getExportUrl() {
+    return `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.EXPORTAR}`;
+  }
+
   // Manejar errores de la API
   handleError(error) {
     if (error.response) {
-      // El servidor respondió con un error
       const message = error.response.data.error || 'Error del servidor';
       return new Error(message);
     } else if (error.request) {
-      // No se recibió respuesta (falla de red o servidor apagado)
-      return new Error('Sin conexión a Internet o el servidor está apagado. Revisa tu WiFi o reinicia el servidor.');
+      return new Error('📡 Sin conexión a Internet o el servidor está inactivo. Verifica tu conexión WiFi o datos móviles.');
     } else {
-      // Error al configurar la petición
       return new Error('Error de configuración: ' + error.message);
     }
   }

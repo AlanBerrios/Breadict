@@ -2,10 +2,10 @@
   "expo": {
     "name": "Breadict",
     "slug": "breadict",
-    "version": "1.0.0",
+    "version": "2.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
@@ -22,15 +22,25 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#2E7D32"
       },
-      "package": "com.panaderiasmart.app"
+      "package": "com.alanberrios.breadict",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-font"
+      "expo-font",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Breadict necesita tu ubicación para obtener el clima local automáticamente."
+        }
+      ]
     ],
-    "description": "Sistema inteligente para predecir compras de pan en panaderías",
+    "description": "Sistema inteligente para predecir compras de pan en panaderías, usando IA y datos climáticos.",
     "extra": {
       "eas": {
         "projectId": "3b5f681d-e9d4-4175-b273-5b63710522ce"

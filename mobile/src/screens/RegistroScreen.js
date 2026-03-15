@@ -197,6 +197,24 @@ const RegistroScreen = () => {
 
     setLoading(true);
     try {
+      // Verificar si ya existe un registro para esta fecha
+      const check = await apiService.checkFechaExiste(formData.fecha);
+      if (check && check.exists) {
+        setLoading(false);
+        const confirmOverwrite = await new Promise((resolve) => {
+          Alert.alert(
+            'Registro Existente',
+            'Ya existe un registro de ventas para esta fecha. ¿Deseas sobreescribirlo?',
+            [
+              { text: 'Cancelar', onPress: () => resolve(false), style: 'cancel' },
+              { text: 'Sobreescribir', onPress: () => resolve(true) }
+            ]
+          );
+        });
+        if (!confirmOverwrite) return;
+        setLoading(true); // Re-iniciar loading si confirma
+      }
+
       const datosParaEnviar = {
         ...formData,
         temperatura_minima: parseFloat(formData.temperatura_minima),

@@ -144,6 +144,22 @@ const ConfiguracionScreen = () => {
     }
   };
 
+  const handleExportar = async () => {
+    try {
+      const url = apiService.getExportUrl();
+      Alert.alert(
+        'Exportar Datos',
+        'Se descargará un archivo CSV con todos tus registros. ¿Deseas continuar?',
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          { text: 'Exportar', onPress: () => Linking.openURL(url) }
+        ]
+      );
+    } catch (e) {
+      Alert.alert('Error', 'No se pudo generar la exportación.');
+    }
+  };
+
   const isDarkMode = isDark;
 
   const styles = StyleSheet.create({
@@ -371,6 +387,25 @@ const ConfiguracionScreen = () => {
         </Button>
       </View>
 
+      {/* Mantenimiento de Datos */}
+      <Card style={styles.card}>
+        <Card.Content>
+          <Title style={styles.cardTitle}>Mantenimiento de Datos</Title>
+          <Text style={[styles.settingDescription, { marginBottom: 15 }]}>
+            Descarga una copia de seguridad de todos tus registros en formato CSV (Excel) para tu control personal.
+          </Text>
+          <Button
+            mode="contained-tonal"
+            icon="download"
+            onPress={handleExportar}
+            buttonColor={isDarkMode ? '#38493a' : '#E8F5E9'}
+            textColor={isDarkMode ? '#81C784' : '#2E7D32'}
+          >
+            Exportar datos (CSV)
+          </Button>
+        </Card.Content>
+      </Card>
+
       {/* Acerca de */}
       <Card style={styles.card}>
         <Card.Content>
@@ -378,7 +413,7 @@ const ConfiguracionScreen = () => {
           
           <View style={styles.aboutRow}>
             <Text style={styles.aboutLabel}>Versión:</Text>
-            <Text style={styles.aboutValue}>2.0.0</Text>
+            <Text style={styles.aboutValue}>2.1.0</Text>
           </View>
           <View style={styles.aboutRow}>
             <Text style={styles.aboutLabel}>Desarrollador:</Text>

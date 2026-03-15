@@ -7,9 +7,11 @@ export const API_CONFIG = {
   BASE_URL: 'https://breadict.onrender.com',
   ENDPOINTS: {
     REGISTRO: '/api/registro',
+    REGISTRO_EXISTE: '/api/registro/existe',
     PREDICCION: '/api/prediccion',
     ESTADISTICAS: '/api/estadisticas',
     ANALITICAS: '/api/analiticas',
+    EXPORTAR: '/api/exportar',
     HEALTH: '/api/health'
   }
 };

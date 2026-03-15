@@ -500,13 +500,42 @@ def obtener_analiticas():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/registro/existe', methods=['GET'])
+def check_registro_exists():
+    """Verifica si ya existe un registro para una fecha dada"""
+    fecha = request.args.get('fecha')
+    if not fecha:
+        return jsonify({"error": "Fecha requerida"}), 400
+    try:
+        registro = db.obtener_registro_fecha(fecha)
+        exists = registro is not None and not registro.empty if hasattr(registro, 'empty') else registro is not None
+        return jsonify({"exists": exists, "fecha": fecha}), 200
+    except Exception as e:
+        return jsonify({"exists": False, "fecha": fecha}), 200
+
+@app.route('/api/exportar', methods=['GET'])
+def exportar_csv():
+    """Exporta todos los registros como CSV"""
+    try:
+        df = db.obtener_todos_los_datos()
+        if df.empty:
+            return jsonify({"error": "No hay datos para exportar"}), 404
+        csv_data = df.to_csv(index=False)
+        return csv_data, 200, {
+            'Content-Type': 'text/csv',
+            'Content-Disposition': 'attachment; filename=breadict_datos.csv'
+        }
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/api/health', methods=['GET'])
 def health_check():
     """Endpoint para verificar que el servidor está funcionando"""
     return jsonify({
         "status": "ok",
         "timestamp": datetime.datetime.now().isoformat(),
-        "version": "2.0.0",
+        "version": "2.1.0",
         "weather_api": "Open-Meteo (gratis, sin API key)",
         "database_type": "PostgreSQL (Cloud)" if db and db.is_postgres else "SQLite (Local)"
     }), 200

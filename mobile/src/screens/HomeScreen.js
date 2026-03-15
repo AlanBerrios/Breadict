@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,7 +7,9 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
-  Image
+  Image,
+  RefreshControl,
+  Animated
 } from 'react-native';
 import { Card, Button, Title, Paragraph, Modal, Portal } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
@@ -23,6 +25,8 @@ const HomeScreen = () => {
   const [estadisticas, setEstadisticas] = useState(null);
   const [serverStatus, setServerStatus] = useState('checking');
   const [weeklyData, setWeeklyData] = useState([]);
+  const [refreshing, setRefreshing] = useState(false);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
   
   // Tutorial State
   const [tutorialVisible, setTutorialVisible] = useState(false);
@@ -81,15 +85,23 @@ const HomeScreen = () => {
       
     } catch (error) {
       setServerStatus('error');
-      Alert.alert(
-        'Error de Conexión',
-        'No se puede conectar al servidor. Asegúrate de que el servidor esté funcionando y que la URL sea correcta.',
-        [{ text: 'OK' }]
-      );
     } finally {
       setLoading(false);
+      setRefreshing(false);
+      // Fade in cards
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }).start();
     }
   };
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fadeAnim.setValue(0);
+    verificarConexion();
+  }, []);
 
   const handleNextTutorial = () => {
     if (tutorialStep < 3) {
@@ -142,11 +154,33 @@ const HomeScreen = () => {
   };
 
   return (
-    <ScrollView style={[styles.container, dynamicStyles.container]} contentContainerStyle={{ paddingBottom: 80 }}>
+    <ScrollView
+      style={[styles.container, dynamicStyles.container]}
+      contentContainerStyle={{ paddingBottom: 80 }}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          colors={['#2E7D32']}
+          tintColor={isDarkMode ? '#81C784' : '#2E7D32'}
+        />
+      }
+    >
       <View style={[styles.header, dynamicStyles.header]}>
         <Text style={styles.title}>{storeName}</Text>
         <Text style={styles.subtitle}>Sistema de Predicción de Ventas</Text>
       </View>
+
+      {/* Offline Banner */}
+      {serverStatus === 'error' && (
+        <View style={[styles.offlineBanner, { backgroundColor: isDarkMode ? '#B71C1C' : '#FFCDD2' }]}>
+          <Text style={{ color: isDarkMode ? '#FFF' : '#B71C1C', fontWeight: 'bold', textAlign: 'center' }}>
+            📡 Sin conexión al servidor. Desliza hacia abajo para reintentar.
+          </Text>
+        </View>
+      )}
+
+      <Animated.View style={{ opacity: fadeAnim }}>
 
       {/* Estado del Servidor y Ubicación */}
       <Card style={[styles.card, dynamicStyles.card]}>
@@ -335,19 +369,8 @@ const HomeScreen = () => {
         </Card.Content>
       </Card>
 
-      {/* Botón de Refrescar */}
-      <Button
-        mode="outlined"
-        onPress={verificarConexion}
-        style={styles.refreshButton}
-        icon="refresh"
-        textColor={isDarkMode ? '#81C784' : '#2E7D32'}
-        theme={{ colors: { outline: isDarkMode ? '#81C784' : '#2E7D32' } }}
-      >
-        Verificar Conexión
-      </Button>
-
       <AppFooter isDarkMode={isDarkMode} />
+      </Animated.View>
 
       {/* Tutorial Modal */}
       <Portal>
@@ -462,6 +485,13 @@ const styles = StyleSheet.create({
   refreshButton: {
     margin: 15,
     borderWidth: 1,
+  },
+  offlineBanner: {
+    padding: 10,
+    marginHorizontal: 15,
+    borderRadius: 8,
+    marginBottom: 10,
+    elevation: 2,
   },
   modalContent: {
     padding: 25,
