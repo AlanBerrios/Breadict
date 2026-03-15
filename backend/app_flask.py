@@ -18,8 +18,9 @@ load_dotenv()
 from database import PanaderiaDB
 
 # --- Configuración Inicial ---
-OPENWEATHERMAP_API_KEY = os.getenv("OPENWEATHERMAP_API_KEY", "")
-CIUDAD_API = "Santiago,CL"
+# Ya no necesitamos API key - Open-Meteo es 100% gratis
+DEFAULT_LAT = -33.45  # Santiago, CL (fallback)
+DEFAULT_LON = -70.65
 
 # Mapeo de climas
 MAPEO_CLIMA_TEXTO_A_NUMERO = {
@@ -27,6 +28,20 @@ MAPEO_CLIMA_TEXTO_A_NUMERO = {
     "despejado": 4, "lluvia ligera": 5, "lluvia": 6
 }
 MAPEO_CLIMA_NUMERO_A_TEXTO = {v: k for k, v in MAPEO_CLIMA_TEXTO_A_NUMERO.items()}
+
+# Mapeo de WMO Weather Codes (Open-Meteo) a nuestro sistema interno
+def wmo_code_a_clima_interno(wmo_code):
+    """Traduce WMO Weather Code de Open-Meteo a nuestro número interno"""
+    if wmo_code in (0,):          return 4  # despejado
+    if wmo_code in (1,):          return 1  # soleado (mainly clear)
+    if wmo_code in (2,):          return 2  # parcialmente nublado
+    if wmo_code in (3, 45, 48):   return 3  # nublado / fog
+    if wmo_code in (51, 53, 56):  return 5  # lluvia ligera (drizzle)
+    if wmo_code in (55, 57):      return 5  # lluvia ligera (dense drizzle)
+    if wmo_code in (61, 63, 80, 81): return 5  # lluvia ligera
+    if wmo_code in (65, 66, 67, 82, 95, 96, 99): return 6  # lluvia fuerte / tormenta
+    if wmo_code in (71, 73, 75, 77, 85, 86):     return 6  # nieve → tratar como lluvia
+    return 3  # fallback: nublado
 
 # Variables globales para el modelo
 modelo_maniana_global = None
@@ -36,87 +51,65 @@ clima_encoder_global = None
 db = None
 
 # --- Funciones de Utilidad ---
-def traducir_clima_api_a_numero_interno(weather_description_api, weather_id_api):
-    """Traduce la descripción del clima de la API a nuestro número interno"""
-    desc = weather_description_api.lower()
-    if 800 == weather_id_api: return MAPEO_CLIMA_TEXTO_A_NUMERO["despejado"]
-    if weather_id_api > 800 and weather_id_api < 805:
-        return MAPEO_CLIMA_TEXTO_A_NUMERO["parcialmente nublado"] if "few clouds" in desc or "scattered clouds" in desc else MAPEO_CLIMA_TEXTO_A_NUMERO["nublado"]
-    if weather_id_api >= 300 and weather_id_api < 400: return MAPEO_CLIMA_TEXTO_A_NUMERO["lluvia ligera"]
-    if weather_id_api >= 500 and weather_id_api < 600:
-        return MAPEO_CLIMA_TEXTO_A_NUMERO["lluvia ligera"] if "light rain" in desc or "moderate rain" in desc else MAPEO_CLIMA_TEXTO_A_NUMERO["lluvia"]
-    if weather_id_api >= 200 and weather_id_api < 300: return MAPEO_CLIMA_TEXTO_A_NUMERO["lluvia"]
-    print(f"Advertencia API: No se pudo traducir '{desc}' (ID: {weather_id_api}). Usando 'nublado'.")
-    return MAPEO_CLIMA_TEXTO_A_NUMERO["nublado"]
-
 def obtener_pronostico_api(fecha_target_str, lat=None, lon=None):
-    """Obtiene el pronóstico del tiempo para una fecha específica y ubicación (GPS)"""
-    print(f"[API Backend] Solicitando pronóstico para: {fecha_target_str} (lat:{lat}, lon:{lon})")
-    if OPENWEATHERMAP_API_KEY == "TU_API_KEY_AQUI" or not OPENWEATHERMAP_API_KEY:
-        print("[API Backend] API Key no configurada.")
-        return "manual"
+    """Obtiene el clima para cualquier fecha usando Open-Meteo (gratis, sin API key)"""
+    print(f"[API Backend] Solicitando clima Open-Meteo para: {fecha_target_str} (lat:{lat}, lon:{lon})")
     
-    url = None
-    masked_key = f"{OPENWEATHERMAP_API_KEY[:4]}...{OPENWEATHERMAP_API_KEY[-4:]}" if len(OPENWEATHERMAP_API_KEY or "") > 8 else "INVALID"
+    use_lat = lat if lat else DEFAULT_LAT
+    use_lon = lon if lon else DEFAULT_LON
+    
     try:
         fecha_target_dt = datetime.datetime.strptime(fecha_target_str, "%Y-%m-%d").date()
         hoy_dt = datetime.date.today()
         delta_dias = (fecha_target_dt - hoy_dt).days
-
-        # Permitir día -1 para cubrir desfases de zona horaria (UTC vs local)
-        if delta_dias < -1 or delta_dias >= 6: return "manual"
         
-        # Siempre intentar usar forecast para tener la min/max global del dia
-        if lat and lon:
-            url = f"https://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}&appid={OPENWEATHERMAP_API_KEY}&units=metric&lang=es"
-            print(f"[API Backend] URL construida (coords): https://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}&appid={masked_key}...")
+        # Decidir qué endpoint usar
+        if delta_dias < 0:
+            # FECHA PASADA → usar Archive API (datos históricos)
+            url = (
+                f"https://archive-api.open-meteo.com/v1/archive"
+                f"?latitude={use_lat}&longitude={use_lon}"
+                f"&start_date={fecha_target_str}&end_date={fecha_target_str}"
+                f"&daily=temperature_2m_max,temperature_2m_min,weathercode"
+                f"&timezone=America/Santiago"
+            )
+            print(f"[API Backend] Usando Open-Meteo ARCHIVO (histórico)")
         else:
-            url = f"https://api.openweathermap.org/data/2.5/forecast?q={CIUDAD_API}&appid={OPENWEATHERMAP_API_KEY}&units=metric&lang=es"
-            print(f"[API Backend] URL construida (ciudad): https://api.openweathermap.org/data/2.5/forecast?q={CIUDAD_API}&appid={masked_key}...")
+            # HOY o FUTURO → usar Forecast API
+            url = (
+                f"https://api.open-meteo.com/v1/forecast"
+                f"?latitude={use_lat}&longitude={use_lon}"
+                f"&daily=temperature_2m_max,temperature_2m_min,weathercode"
+                f"&timezone=America/Santiago"
+                f"&start_date={fecha_target_str}&end_date={fecha_target_str}"
+            )
+            print(f"[API Backend] Usando Open-Meteo FORECAST")
 
         response = requests.get(url)
         response.raise_for_status()
         data = response.json()
-
-        temps_min_dia, temps_max_dia, descs_dia, ids_dia = [], [], [], []
-        for item in data.get('list', []):
-            if datetime.datetime.fromtimestamp(item['dt']).date() == fecha_target_dt:
-                temps_min_dia.append(item['main']['temp_min'])
-                temps_max_dia.append(item['main']['temp_max'])
-                if not descs_dia:
-                    descs_dia.append(item['weather'][0]['description'])
-                    ids_dia.append(item['weather'][0]['id'])
-
-        # Si no hay pronosticos para "hoy" (ej: OWM corto el dia o desfase de zona horaria), hacer fallback a /weather actual
-        if not temps_min_dia and delta_dias <= 0:
-            if lat and lon:
-                url_current = f"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={OPENWEATHERMAP_API_KEY}&units=metric&lang=es"
-            else:
-                url_current = f"https://api.openweathermap.org/data/2.5/weather?q={CIUDAD_API}&appid={OPENWEATHERMAP_API_KEY}&units=metric&lang=es"
-            
-            resp_cur = requests.get(url_current)
-            resp_cur.raise_for_status()
-            data_cur = resp_cur.json()
-            
-            temp_min = data_cur['main']['temp_min']
-            temp_max = data_cur['main']['temp_max']
-            clima_num = traducir_clima_api_a_numero_interno(data_cur['weather'][0]['description'], data_cur['weather'][0]['id'])
-            clima_map_str = MAPEO_CLIMA_NUMERO_A_TEXTO.get(clima_num, "nublado")
-            return round(temp_min), round(temp_max), clima_num, clima_map_str
-            
-        if not temps_min_dia: 
+        
+        daily = data.get('daily', {})
+        temps_min = daily.get('temperature_2m_min', [])
+        temps_max = daily.get('temperature_2m_max', [])
+        weather_codes = daily.get('weathercode', [])
+        
+        if not temps_min or not temps_max:
+            print(f"[API Backend] Open-Meteo no retornó datos para {fecha_target_str}")
             return "manual"
-            
-        clima_num = traducir_clima_api_a_numero_interno(descs_dia[0], ids_dia[0])
-        clima_map_str = MAPEO_CLIMA_NUMERO_A_TEXTO.get(clima_num, "nublado")
-        return round(min(temps_min_dia)), round(max(temps_max_dia)), clima_num, clima_map_str
+        
+        temp_min = round(temps_min[0])
+        temp_max = round(temps_max[0])
+        wmo_code = weather_codes[0] if weather_codes else 3
+        
+        clima_num = wmo_code_a_clima_interno(wmo_code)
+        clima_texto = MAPEO_CLIMA_NUMERO_A_TEXTO.get(clima_num, "nublado")
+        
+        print(f"[API Backend] Open-Meteo OK: {temp_min}°C-{temp_max}°C, WMO:{wmo_code} → {clima_texto}")
+        return temp_min, temp_max, clima_num, clima_texto
 
-    except requests.exceptions.HTTPError as http_err:
-        print(f"[API Backend] Error HTTP {http_err.response.status_code}: {http_err.response.text[:200]}")
-        if http_err.response.status_code == 401: 
-            print("[API Backend] Error 401: No autorizado. Verifica API Key en Entorno.")
     except Exception as e:
-        print(f"[API Backend] Error inesperado: {e}")
+        print(f"[API Backend] Error Open-Meteo: {e}")
         traceback.print_exc()
     return "manual"
 
@@ -513,8 +506,8 @@ def health_check():
     return jsonify({
         "status": "ok",
         "timestamp": datetime.datetime.now().isoformat(),
-        "version": "1.0.0",
-        "env_key_set": bool(OPENWEATHERMAP_API_KEY and OPENWEATHERMAP_API_KEY != "TU_API_KEY_AQUI"),
+        "version": "2.0.0",
+        "weather_api": "Open-Meteo (gratis, sin API key)",
         "database_type": "PostgreSQL (Cloud)" if db and db.is_postgres else "SQLite (Local)"
     }), 200
 
