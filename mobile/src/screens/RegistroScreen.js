@@ -5,13 +5,14 @@ import {
   StyleSheet,
   ScrollView,
   Alert,
-  ActivityIndicator
+  ActivityIndicator,
+  TouchableOpacity
 } from 'react-native';
 import { Card, Button, Title, TextInput, HelperText } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import apiService from '../services/apiService';
 import { CLIMA_OPTIONS } from '../config/api';
-import { format } from 'date-fns';
+import { format, addDays, subDays, parseISO } from 'date-fns';
 import { useSettings } from '../context/SettingsContext';
 
 const RegistroScreen = () => {
@@ -70,31 +71,78 @@ const RegistroScreen = () => {
     return Object.keys(newErrors).length === 0;
   };
 
+  // Navegar fecha
+  const changeDate = (direction) => {
+    const currentDate = parseISO(formData.fecha);
+    const newDate = direction === 'next' ? addDays(currentDate, 1) : subDays(currentDate, 1);
+    const today = new Date();
+    // No permitir fechas futuras más allá de hoy
+    if (newDate > today) {
+      Alert.alert('Aviso', 'No puedes registrar ventas de un día futuro.');
+      return;
+    }
+    const newFechaStr = format(newDate, 'yyyy-MM-dd');
+    setFormData(prev => ({
+      ...prev,
+      fecha: newFechaStr,
+      clima_promedio: '',
+      temperatura_minima: '',
+      temperatura_maxima: '',
+    }));
+    setShowWeatherForm(true); // Reset weather form when date changes
+  };
+
   // Auto-completar Clima
   const handleAutoClima = async () => {
     setFetchingWeather(true);
     try {
       // Pedimos predicción al servidor sin datos manuales para forzar lectura API
       const response = await apiService.obtenerPrediccion(formData.fecha, location, null);
-      
-      // La API nos devuelve clima_texto.
-      let climaVal = 'soleado';
-      if (response.clima_texto) {
-         climaVal = response.clima_texto.toLowerCase();
+
+      if (response.aviso) {
+        // Modelos no entrenados pero tenemos clima
+        let climaVal = response.clima_texto ? response.clima_texto.toLowerCase() : '';
+        if (climaVal && response.temperatura_minima != null) {
+          setFormData(prev => ({
+            ...prev,
+            clima_promedio: climaVal,
+            temperatura_minima: String(response.temperatura_minima),
+            temperatura_maxima: String(response.temperatura_maxima),
+          }));
+          setShowWeatherForm(false);
+        } else {
+          Alert.alert('Clima no disponible', 'El clima automático no está disponible para esta fecha. Ingrésalo manualmente.');
+          setShowWeatherForm(true);
+        }
+      } else {
+        // Normal response with clima
+        let climaVal = 'soleado';
+        if (response.clima_texto) {
+          climaVal = response.clima_texto.toLowerCase();
+        }
+
+        setFormData(prev => ({
+          ...prev,
+          clima_promedio: climaVal,
+          temperatura_minima: String(response.temperatura_minima),
+          temperatura_maxima: String(response.temperatura_maxima),
+        }));
+        setShowWeatherForm(false);
       }
-      
-      setFormData(prev => ({
-        ...prev,
-        clima_promedio: climaVal, // Usar directamente el string ('soleado', 'nublado', etc)
-        temperatura_minima: String(response.temperatura_minima),
-        temperatura_maxima: String(response.temperatura_maxima),
-      }));
-      
-      setShowWeatherForm(false); // Ocultar formulario al obtener con éxito
-      
     } catch (e) {
-      Alert.alert('Error API de Clima', 'No se pudo obtener el clima automático. Por favor, ingrésalo manualmente.');
-      setShowWeatherForm(true); // Forzar mostrar el form si hubo error
+      // Check if it's a past date beyond forecast range
+      const selectedDate = parseISO(formData.fecha);
+      const today = new Date();
+      const diffDays = Math.floor((today - selectedDate) / (1000 * 60 * 60 * 24));
+      if (diffDays > 1) {
+        Alert.alert(
+          'Fecha muy antigua',
+          'El clima automático solo está disponible para hoy y los próximos 5 días. Para fechas pasadas, ingresa el clima manualmente.'
+        );
+      } else {
+        Alert.alert('Error API de Clima', 'No se pudo obtener el clima automático. Por favor, ingrésalo manualmente.');
+      }
+      setShowWeatherForm(true);
     } finally {
       setFetchingWeather(false);
     }
@@ -166,16 +214,32 @@ const RegistroScreen = () => {
         <Card.Content>
           <Title style={styles.cardTitle}>Información del Día</Title>
           
-          <TextInput
-            label="Fecha"
-            value={formData.fecha}
-            onChangeText={(value) => updateField('fecha', value)}
-            mode="outlined"
-            style={[styles.input, dynamicStyles.input]}
-            editable={false}
-            textColor={dynamicStyles.text.color}
-            theme={{ colors: { primary: isDarkMode ? '#81C784' : '#2E7D32', placeholder: dynamicStyles.subText.color }}}
-          />
+          <View style={styles.dateRow}>
+            <TouchableOpacity
+              style={[styles.dateArrow, { backgroundColor: isDarkMode ? '#388E3C' : '#E8F5E8' }]}
+              onPress={() => changeDate('prev')}
+            >
+              <Text style={[styles.dateArrowText, { color: isDarkMode ? '#FFF' : '#2E7D32' }]}>◀</Text>
+            </TouchableOpacity>
+
+            <View style={[styles.dateDisplay, { backgroundColor: isDarkMode ? '#2C2C2C' : '#F5F5F5' }]}>              
+              <Text style={[styles.dateText, { color: isDarkMode ? '#FFFFFF' : '#333333' }]}>
+                📅 {formData.fecha}
+              </Text>
+              {formData.fecha !== format(new Date(), 'yyyy-MM-dd') && (
+                <Text style={[styles.dateHint, { color: isDarkMode ? '#FFB74D' : '#F57C00' }]}>                  
+                  (Fecha anterior)
+                </Text>
+              )}
+            </View>
+
+            <TouchableOpacity
+              style={[styles.dateArrow, { backgroundColor: isDarkMode ? '#388E3C' : '#E8F5E8' }]}
+              onPress={() => changeDate('next')}
+            >
+              <Text style={[styles.dateArrowText, { color: isDarkMode ? '#FFF' : '#2E7D32' }]}>▶</Text>
+            </TouchableOpacity>
+          </View>
           <HelperText type="error" visible={!!errors.fecha}>{errors.fecha}</HelperText>
 
           <Button 
@@ -359,7 +423,31 @@ const styles = StyleSheet.create({
   weatherSummary: { padding: 15, borderRadius: 8, borderWidth: 1, alignItems: 'center', marginTop: 10 },
   summaryText: { fontSize: 16, fontWeight: 'bold', marginBottom: 5 },
   rowInputs: { flexDirection: 'row', justifyContent: 'space-between' },
-  halfInput: { width: '48%', marginBottom: 5 }
+  halfInput: { width: '48%', marginBottom: 5 },
+  dateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 5,
+  },
+  dateArrow: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 2,
+  },
+  dateArrowText: { fontSize: 18, fontWeight: 'bold' },
+  dateDisplay: {
+    flex: 1,
+    marginHorizontal: 10,
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  dateText: { fontSize: 17, fontWeight: 'bold' },
+  dateHint: { fontSize: 12, marginTop: 2 },
 });
 
 export default RegistroScreen;
