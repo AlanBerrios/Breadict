@@ -254,7 +254,7 @@ def inicializar():
     csv_path = "datos_panaderia_kilos.csv"
     if os.path.exists(csv_path):
         print(f"[App Backend] Detectado CSV de entrenamiento: {csv_path}")
-        exito = db.migrar_csv_a_sqlite(csv_path)
+        exito = db.migrar_csv(csv_path)
         print(f"[App Backend] Resultado migración: {'Exitosa' if exito else 'Fallida'}")
     else:
         print(f"[App Backend] No se encontró CSV inicial en {os.getcwd()}")

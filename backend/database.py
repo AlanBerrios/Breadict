@@ -169,55 +169,67 @@ class PanaderiaDB:
         conn.close()
         return count
     
-    def migrar_csv_a_sqlite(self, csv_path):
-        """Migra datos del CSV existente a SQLite"""
+    def migrar_csv(self, csv_path):
+        """Migra datos del CSV existente a la base de datos (solo si está vacía)"""
         if not os.path.exists(csv_path):
-            print(f"[DB Backend] CRITICAL: Archivo CSV {csv_path} no encontrado en {os.getcwd()}")
+            print(f"[DB Backend] Archivo CSV {csv_path} no encontrado.")
             return False
         
+        # Verificar si ya hay datos para evitar duplicar migración pesada en cada reinicio
+        try:
+            if self.contar_registros() > 0:
+                print("[DB Backend] La base de datos ya tiene información. Saltando migración inicial.")
+                return True
+        except:
+            pass
+
         print(f"[DB Backend] Iniciando migración desde: {csv_path}")
         try:
             df = pd.read_csv(csv_path)
-            
-            # Renombrar columnas si es necesario
             column_mapping = {
-                'Fecha': 'fecha',
-                'Clima promedio': 'clima_promedio',
-                'Temperatura mínima': 'temperatura_minima',
-                'Temperatura maxima': 'temperatura_maxima',
-                'Pan comprado mañana': 'pan_comprado_maniana',
-                'Pan comprado tarde': 'pan_comprado_tarde',
-                'Pan vendido mañana': 'pan_vendido_maniana',
-                'Pan vendido tarde': 'pan_vendido_tarde'
+                'Fecha': 'fecha', 'Clima promedio': 'clima_promedio',
+                'Temperatura mínima': 'temperatura_minima', 'Temperatura maxima': 'temperatura_maxima',
+                'Pan comprado mañana': 'pan_comprado_maniana', 'Pan comprado tarde': 'pan_comprado_tarde',
+                'Pan vendido mañana': 'pan_vendido_maniana', 'Pan vendido tarde': 'pan_vendido_tarde'
             }
-            
-            # Aplicar mapeo de columnas
             df = df.rename(columns=column_mapping)
-            
-            # Convertir fecha a formato YYYY-MM-DD
             df['fecha'] = pd.to_datetime(df['fecha']).dt.strftime('%Y-%m-%d')
             
-            # Insertar cada registro
             conn = self.get_connection()
             cursor = conn.cursor()
             
+            db_type = "PostgreSQL" if self.is_postgres else "SQLite"
             ph = "%s" if self.is_postgres else "?"
-            for _, row in df.iterrows():
-                if pd.notna(row['fecha']) and pd.notna(row['clima_promedio']):
-                    self.insertar_registro(
-                        row['fecha'], row['clima_promedio'], 
-                        row['temperatura_minima'], row['temperatura_maxima'],
-                        int(row['pan_comprado_maniana']), int(row['pan_comprado_tarde']),
-                        int(row['pan_vendido_maniana']), int(row['pan_vendido_tarde'])
-                    )
             
+            for _, row in df.iterrows():
+                if pd.notna(row['fecha']):
+                    # Inserción directa en un solo loop para ahorrar conexiones
+                    if self.is_postgres:
+                        cursor.execute('''
+                            INSERT INTO registros_panaderia 
+                            (fecha, clima_promedio, temperatura_minima, temperatura_maxima,
+                             pan_comprado_maniana, pan_comprado_tarde, pan_vendido_maniana, pan_vendido_tarde)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                            ON CONFLICT (fecha) DO NOTHING
+                        ''', (row['fecha'], row['clima_promedio'], row['temperatura_minima'], row['temperatura_maxima'],
+                              int(row['pan_comprado_maniana']), int(row['pan_comprado_tarde']),
+                              int(row['pan_vendido_maniana']), int(row['pan_vendido_tarde'])))
+                    else:
+                        cursor.execute('''
+                            INSERT OR IGNORE INTO registros_panaderia 
+                            (fecha, clima_promedio, temperatura_minima, temperatura_maxima,
+                             pan_comprado_maniana, pan_comprado_tarde, pan_vendido_maniana, pan_vendido_tarde)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        ''', (row['fecha'], row['clima_promedio'], row['temperatura_minima'], row['temperatura_maxima'],
+                              int(row['pan_comprado_maniana']), int(row['pan_comprado_tarde']),
+                              int(row['pan_vendido_maniana']), int(row['pan_vendido_tarde'])))
+            
+            conn.commit()
             conn.close()
             
-            db_type = "PostgreSQL" if self.is_postgres else "SQLite"
-            print(f"[DB Backend] Migrados {len(df)} registros del CSV a {db_type} correctamente.")
+            print(f"[DB Backend] Migrados {len(df)} registros a {db_type} correctamente.")
             return True
             
         except Exception as e:
             print(f"[DB Backend] ERROR migrando CSV: {e}")
-            traceback.print_exc()
             return False
