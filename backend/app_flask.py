@@ -3,7 +3,7 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import LabelEncoder
 import numpy as np
 import datetime
-import os
+
 import requests
 import json
 import traceback
@@ -213,9 +213,9 @@ def entrenar_modelos_globales():
             print("[Model Backend] Datos insuficientes para entrenamiento.")
             return False
 
-        # Entrenar modelos
-        modelo_maniana_global = RandomForestRegressor(n_estimators=100, random_state=42)
-        modelo_tarde_global = RandomForestRegressor(n_estimators=100, random_state=42)
+        # Entrenar modelos (Optimizados para prevenir Overfitting en datasets pequeños)
+        modelo_maniana_global = RandomForestRegressor(n_estimators=20, max_depth=5, random_state=42)
+        modelo_tarde_global = RandomForestRegressor(n_estimators=20, max_depth=5, random_state=42)
         
         modelo_maniana_global.fit(X, y_maniana)
         modelo_tarde_global.fit(X, y_tarde)

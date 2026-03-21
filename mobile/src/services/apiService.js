@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { API_CONFIG } from '../config/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 class ApiService {
   constructor() {
@@ -24,6 +25,7 @@ class ApiService {
 
   // Obtener predicción para una fecha específica
   async obtenerPrediccion(fecha, ubicacion = null, datosManuales = null) {
+    const cacheKey = `@prediccion_${fecha}`;
     try {
       const params = { fecha };
       
@@ -40,8 +42,26 @@ class ApiService {
       }
 
       const response = await this.api.get(API_CONFIG.ENDPOINTS.PREDICCION, { params });
+      
+      // Guardar en cache offline si la respuesta es exitosa
+      if (response.data && !response.data.error) {
+        try {
+          await AsyncStorage.setItem(cacheKey, JSON.stringify(response.data));
+        } catch(e) { /* ignore storage errors */ }
+      }
+      
       return response.data;
     } catch (error) {
+      // Intentar recuperar de cache si hay error de red
+      try {
+        const cachedStr = await AsyncStorage.getItem(cacheKey);
+        if (cachedStr) {
+          const cachedData = JSON.parse(cachedStr);
+          cachedData.isOffline = true; // Flag for frontend
+          return cachedData;
+        }
+      } catch(e) { /* ignore storage errors */ }
+      
       throw this.handleError(error);
     }
   }

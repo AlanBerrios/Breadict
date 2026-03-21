@@ -322,6 +322,12 @@ const PrediccionScreen = () => {
           <Card.Content>
             <Title style={[styles.resultTitle, { color: isDarkMode ? '#A5D6A7' : '#2E7D32' }]}>📊 Resultados de Predicción</Title>
             
+            {prediccion.isOffline && (
+              <View style={{ backgroundColor: '#FF8A65', padding: 6, borderRadius: 6, marginBottom: 15, alignItems: 'center' }}>
+                <Text style={{ color: '#FFF', fontWeight: 'bold', fontSize: 13 }}>📡 MODO OFFLINE (Pronóstico Guardado)</Text>
+              </View>
+            )}
+
             <View style={styles.resultRow}>
               <Text style={[styles.resultLabel, { color: isDarkMode ? '#E0E0E0' : '#333' }]}>Fecha:</Text>
               <Text style={[styles.resultValue, { color: isDarkMode ? '#FFF' : '#333' }]}>
