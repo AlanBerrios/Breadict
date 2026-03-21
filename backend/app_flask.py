@@ -605,14 +605,9 @@ def health_check():
     if is_ready:
         db_type = "PostgreSQL (Cloud)" if db.is_postgres else "SQLite (Local)"
     
-    # Verificar clima (Open-Meteo) de forma rápida
-    weather_ok = False
-    try:
-        # Petición minimalista para probar conectividad (con timeout corto)
-        test_weather = requests.get("https://api.open-meteo.com/v1/forecast?latitude=0&longitude=0&daily=weathercode&timezone=auto&forecast_days=1", timeout=2)
-        weather_ok = test_weather.status_code == 200
-    except:
-        weather_ok = False
+    # Asumimos que la API de clima está bien por defecto para no gastar el límite de peticiones (Rate Limit 429)
+    # Open-Meteo bloquea la IP entera si hacemos muchas llamadas en el healthcheck.
+    weather_ok = True
 
     return jsonify({
         "status": "ok" if is_ready else "initializing",
