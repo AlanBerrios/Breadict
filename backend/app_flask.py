@@ -10,13 +10,12 @@ import traceback
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import threading
+import os
 from dotenv import load_dotenv
 import holidays
+from database import PanaderiaDB
 
 load_dotenv()
-
-# Importar nuestra clase de base de datos
-from database import PanaderiaDB
 
 # --- Configuración Inicial ---
 # Ya no necesitamos API key - Open-Meteo es 100% gratis
@@ -50,6 +49,9 @@ modelo_tarde_global = None
 features_entrenamiento = None
 clima_encoder_global = None
 db = None
+init_lock = threading.Lock()
+init_started = False
+pid_init = None
 
 # --- Funciones de Utilidad ---
 def obtener_pronostico_api(fecha_target_str, lat=None, lon=None):
@@ -269,32 +271,34 @@ CORS(app)  # Permitir peticiones desde la app móvil
 
 def inicializar():
     """Inicializa la base de datos y los modelos"""
-    global db
-    print(f"[App Backend] Inicializando en: {os.getcwd()}")
-    db = PanaderiaDB()
-    
-    # Migrar datos del CSV si existe
-    csv_path = "datos_panaderia_kilos.csv"
-    if os.path.exists(csv_path):
-        print(f"[App Backend] Detectado CSV de entrenamiento: {csv_path}")
-        exito = db.migrar_csv(csv_path)
-        print(f"[App Backend] Resultado migración: {'Exitosa' if exito else 'Fallida'}")
-    else:
-        print(f"[App Backend] No se encontró CSV inicial en {os.getcwd()}")
-    
-    # Entrenar modelos iniciales
-    status_entrenamiento = entrenar_modelos_globales()
-    print(f"[App Backend] Modelos entrenados al inicio: {'Sí' if status_entrenamiento else 'No (Faltan datos)'}")
+    global db, pid_init
+    pid_init = os.getpid()
+    print(f"[App Backend][PID:{pid_init}] Iniciando inicialización...")
+    try:
+        db = PanaderiaDB()
+        
+        # Migrar datos del CSV si existe
+        csv_path = "datos_panaderia_kilos.csv"
+        if os.path.exists(csv_path):
+            print(f"[App Backend][PID:{pid_init}] Migrando CSV...")
+            db.migrar_csv(csv_path)
+            
+        # Entrenar modelos iniciales
+        status_entrenamiento = entrenar_modelos_globales()
+        print(f"[App Backend][PID:{pid_init}] Inicialización completada. Modelos: {status_entrenamiento}")
+    except Exception as e:
+        print(f"[App Backend][PID:{pid_init}] ERROR EN INICIALIZACIÓN: {e}")
+        traceback.print_exc()
 
-# Llamar a la inicialización en un hilo separado para no bloquear el inicio del servidor
-# Esto evita que Render de error de "Port scan timeout"
 def iniciar_segundo_plano():
-    with app.app_context():
-        inicializar()
-
-thread = threading.Thread(target=iniciar_segundo_plano)
-thread.daemon = True
-thread.start()
+    global init_started
+    with init_lock:
+        if not init_started:
+            init_started = True
+            print(f"[App Backend][PID:{os.getpid()}] Lanzando hilo de inicialización...")
+            thread = threading.Thread(target=inicializar)
+            thread.daemon = True
+            thread.start()
 
 # --- Endpoints de la API ---
 
@@ -585,7 +589,18 @@ def exportar_csv():
 @app.route('/api/health', methods=['GET'])
 def health_check():
     """Endpoint para verificar que el servidor está funcionando"""
+    global db
+    
+    # Lazy start de la inicialización si aún no ha empezado
+    if not init_started:
+        iniciar_segundo_plano()
+
     is_ready = db is not None
+    current_pid = os.getpid()
+    
+    # Log minimalista para debug
+    print(f"[Health][PID:{current_pid}] db_status: {'OK' if is_ready else 'INIT'} | init_pid: {pid_init}")
+    
     db_type = "pending"
     if is_ready:
         db_type = "PostgreSQL (Cloud)" if db.is_postgres else "SQLite (Local)"
@@ -593,8 +608,8 @@ def health_check():
     # Verificar clima (Open-Meteo) de forma rápida
     weather_ok = False
     try:
-        # Petición minimalista para probar conectividad
-        test_weather = requests.get("https://api.open-meteo.com/v1/forecast?latitude=0&longitude=0&daily=weathercode&timezone=auto&forecast_days=1", timeout=3)
+        # Petición minimalista para probar conectividad (con timeout corto)
+        test_weather = requests.get("https://api.open-meteo.com/v1/forecast?latitude=0&longitude=0&daily=weathercode&timezone=auto&forecast_days=1", timeout=2)
         weather_ok = test_weather.status_code == 200
     except:
         weather_ok = False
@@ -602,11 +617,13 @@ def health_check():
     return jsonify({
         "status": "ok" if is_ready else "initializing",
         "timestamp": datetime.datetime.now().isoformat(),
-        "version": "2.1.0",
+        "version": "2.2.0", # Actualizando versión en la respuesta
         "database_connected": is_ready,
         "database_type": db_type,
         "models_trained": (modelo_maniana_global is not None) if is_ready else False,
-        "weather_api_ok": weather_ok
+        "weather_api_ok": weather_ok,
+        "process_id": current_pid,
+        "init_process_id": pid_init
     }), 200
 
 if __name__ == '__main__':
