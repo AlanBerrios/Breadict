@@ -146,6 +146,27 @@ const AnaliticasScreen = () => {
                 <Text style={[styles.statValue, { color: isDarkMode ? '#CE93D8' : '#7B1FA2' }]}>{item.comprado} kg</Text>
               </View>
             </View>
+
+            {/* Datos de Demanda Insatisfecha (Opcionales) */}
+            {(item.clientes_sin_pan > 0 || item.hora_quiebre) && (
+              <View style={[styles.extraRow, { backgroundColor: isDarkMode ? '#1A237E33' : '#E8EAF6' }]}>
+                <Text style={[styles.extraTitle, { color: isDarkMode ? '#9FA8DA' : '#3F51B5' }]}>
+                  🚨 Demanda No Cubierta
+                </Text>
+                <View style={styles.extraStats}>
+                  {item.hora_quiebre ? (
+                    <Text style={[styles.extraText, { color: isDarkMode ? '#C5CAE9' : '#303F9F' }]}>
+                      ⚠️ Stock agotado a las: <Text style={{fontWeight:'bold'}}>{item.hora_quiebre}</Text>
+                    </Text>
+                  ) : null}
+                  {item.clientes_sin_pan > 0 ? (
+                    <Text style={[styles.extraText, { color: isDarkMode ? '#C5CAE9' : '#303F9F' }]}>
+                      👥 Clientes sin pan: <Text style={{fontWeight:'bold'}}>{item.clientes_sin_pan}</Text>
+                    </Text>
+                  ) : null}
+                </View>
+              </View>
+            )}
           </Card.Content>
         </Card>
       </View>
@@ -248,6 +269,10 @@ const styles = StyleSheet.create({
   statValue: { fontSize: 18, fontWeight: 'bold', marginTop: 2 },
   dotsContainer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 12, gap: 4 },
   dot: { borderRadius: 5 },
+  extraRow: { marginTop: 14, padding: 12, borderRadius: 12, borderLeftWidth: 4, borderLeftColor: '#3F51B5' },
+  extraTitle: { fontSize: 13, fontWeight: 'bold', marginBottom: 6 },
+  extraStats: { gap: 4 },
+  extraText: { fontSize: 13 },
 });
 
 export default AnaliticasScreen;

@@ -447,12 +447,12 @@ const RegistroScreen = () => {
           </View>
 
           {/* Demanda Insatisfecha */}
-          <Title style={[styles.cardTitle, { marginTop: 20, color: isDarkMode ? '#64B5F6' : '#2196F3' }]}>Demanda Insatisfecha (Opcional)</Title>
+          <Title style={[styles.cardTitle, { marginTop: 20, color: isDarkMode ? '#64B5F6' : '#2196F3' }]}>📊 Demanda Real (Opcional)</Title>
           <Text style={[dynamicStyles.subText, { marginBottom: 10 }]}>
-            Si te quedaste sin pan, ¿cuánta gente te preguntó y no pudo comprar? Esto ayuda a la IA a predecir la demanda real.
+            Si te quedaste sin pan antes de cerrar (quiebre de stock), completa estos datos. Ayudan a la IA a entender que la demanda real era mayor a lo que finalmente vendiste.
           </Text>
           <TextInput
-            label="Clientes que preguntaron sin éxito"
+            label="Clientes que no pudieron comprar"
             value={formData.clientes_sin_pan}
             onChangeText={(value) => updateField('clientes_sin_pan', value)}
             mode="outlined"
@@ -462,11 +462,12 @@ const RegistroScreen = () => {
             theme={{ colors: { primary: isDarkMode ? '#64B5F6' : '#2196F3', placeholder: dynamicStyles.subText.color }}}
           />
           <TextInput
-            label="Hora aprox. de quiebre (ej: 18:30)"
+            label="¿A qué hora se acabó el pan? (ej: 18:30)"
             value={formData.hora_quiebre}
             onChangeText={(value) => updateField('hora_quiebre', value)}
             mode="outlined"
             style={[styles.input, dynamicStyles.input, { marginTop: 5 }]}
+            placeholder="Ej: 19:15"
             textColor={dynamicStyles.text.color}
             theme={{ colors: { primary: isDarkMode ? '#64B5F6' : '#2196F3', placeholder: dynamicStyles.subText.color }}}
           />

@@ -561,7 +561,9 @@ def obtener_analiticas():
                 "temp_max": float(row['temperatura_maxima']),
                 "vendido": vendido_total,
                 "comprado": comprado_total,
-                "predicho": predicho_total
+                "predicho": predicho_total,
+                "clientes_sin_pan": int(row.get('clientes_sin_pan', 0)) if pd.notnull(row.get('clientes_sin_pan')) else 0,
+                "hora_quiebre": str(row.get('hora_quiebre', '')) if pd.notnull(row.get('hora_quiebre')) else ''
             })
         
         return jsonify({"registros": registros, "total": len(registros)}), 200
