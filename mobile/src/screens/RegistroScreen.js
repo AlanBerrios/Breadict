@@ -34,7 +34,9 @@ const RegistroScreen = () => {
     pan_comprado_maniana: '',
     pan_comprado_tarde: '',
     pan_vendido_maniana: '',
-    pan_vendido_tarde: ''
+    pan_vendido_tarde: '',
+    clientes_sin_pan: '',
+    hora_quiebre: ''
   });
 
   // Estado de errores
@@ -60,11 +62,14 @@ const RegistroScreen = () => {
 
     if (!formData.fecha) newErrors.fecha = 'La fecha es requerida';
     if (!formData.clima_promedio) newErrors.clima_promedio = 'Selecciona un clima';
-    if (!formData.temperatura_minima || formData.temperatura_minima <= 0) newErrors.temperatura_minima = 'Temperatura mínima inválida';
-    if (!formData.temperatura_maxima || formData.temperatura_maxima <= 0) newErrors.temperatura_maxima = 'Temperatura máxima inválida';
+    const minTemp = parseFloat(formData.temperatura_minima);
+    const maxTemp = parseFloat(formData.temperatura_maxima);
 
-    if (parseFloat(formData.temperatura_minima) > parseFloat(formData.temperatura_maxima)) {
-      newErrors.temperatura_maxima = 'La temperatura máxima debe ser mayor o igual que la mínima';
+    if (formData.temperatura_minima === '' || isNaN(minTemp)) newErrors.temperatura_minima = 'Debe ser un número válido';
+    if (formData.temperatura_maxima === '' || isNaN(maxTemp)) newErrors.temperatura_maxima = 'Debe ser un número válido';
+
+    if (!newErrors.temperatura_minima && !newErrors.temperatura_maxima && minTemp > maxTemp) {
+      newErrors.temperatura_maxima = 'La máxima debe ser mayor o igual a la mínima';
     }
 
     ['pan_comprado_maniana', 'pan_comprado_tarde', 'pan_vendido_maniana', 'pan_vendido_tarde'].forEach(field => {
@@ -94,6 +99,8 @@ const RegistroScreen = () => {
       clima_promedio: '',
       temperatura_minima: '',
       temperatura_maxima: '',
+      clientes_sin_pan: '',
+      hora_quiebre: ''
     }));
     setShowWeatherForm(true);
     // Auto-fetch weather for new date
@@ -222,7 +229,9 @@ const RegistroScreen = () => {
         pan_comprado_maniana: parseInt(formData.pan_comprado_maniana),
         pan_comprado_tarde: parseInt(formData.pan_comprado_tarde),
         pan_vendido_maniana: parseInt(formData.pan_vendido_maniana),
-        pan_vendido_tarde: parseInt(formData.pan_vendido_tarde)
+        pan_vendido_tarde: parseInt(formData.pan_vendido_tarde),
+        clientes_sin_pan: formData.clientes_sin_pan ? parseInt(formData.clientes_sin_pan) : 0,
+        hora_quiebre: formData.hora_quiebre || null
       };
 
       await apiService.registrarDatos(datosParaEnviar);
@@ -436,6 +445,31 @@ const RegistroScreen = () => {
               <HelperText type="error" visible={!!errors.pan_vendido_tarde}>{errors.pan_vendido_tarde}</HelperText>
             </View>
           </View>
+
+          {/* Demanda Insatisfecha */}
+          <Title style={[styles.cardTitle, { marginTop: 20, color: isDarkMode ? '#64B5F6' : '#2196F3' }]}>Demanda Insatisfecha (Opcional)</Title>
+          <Text style={[dynamicStyles.subText, { marginBottom: 10 }]}>
+            Si te quedaste sin pan, ¿cuánta gente te preguntó y no pudo comprar? Esto ayuda a la IA a predecir la demanda real.
+          </Text>
+          <TextInput
+            label="Clientes que preguntaron sin éxito"
+            value={formData.clientes_sin_pan}
+            onChangeText={(value) => updateField('clientes_sin_pan', value)}
+            mode="outlined"
+            style={[styles.input, dynamicStyles.input]}
+            keyboardType="numeric"
+            textColor={dynamicStyles.text.color}
+            theme={{ colors: { primary: isDarkMode ? '#64B5F6' : '#2196F3', placeholder: dynamicStyles.subText.color }}}
+          />
+          <TextInput
+            label="Hora aprox. de quiebre (ej: 18:30)"
+            value={formData.hora_quiebre}
+            onChangeText={(value) => updateField('hora_quiebre', value)}
+            mode="outlined"
+            style={[styles.input, dynamicStyles.input, { marginTop: 5 }]}
+            textColor={dynamicStyles.text.color}
+            theme={{ colors: { primary: isDarkMode ? '#64B5F6' : '#2196F3', placeholder: dynamicStyles.subText.color }}}
+          />
         </Card.Content>
       </Card>
 

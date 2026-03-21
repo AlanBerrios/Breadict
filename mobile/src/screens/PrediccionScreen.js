@@ -104,11 +104,17 @@ const PrediccionScreen = () => {
     const newErrors = {};
     if (!formData.fecha) newErrors.fecha = 'La fecha es requerida';
     if (!formData.clima_num) newErrors.clima_num = 'Selecciona un clima';
-    if (!formData.temp_min || formData.temp_min <= 0) newErrors.temp_min = 'Temperatura mínima inválida';
-    if (!formData.temp_max || formData.temp_max <= 0) newErrors.temp_max = 'Temperatura máxima inválida';
-    if (parseFloat(formData.temp_min) > parseFloat(formData.temp_max)) {
-      newErrors.temp_max = 'La temperatura máxima debe ser mayor que la mínima';
+    
+    const minTemp = parseFloat(formData.temp_min);
+    const maxTemp = parseFloat(formData.temp_max);
+
+    if (formData.temp_min === '' || isNaN(minTemp)) newErrors.temp_min = 'Debe ser un número válido';
+    if (formData.temp_max === '' || isNaN(maxTemp)) newErrors.temp_max = 'Debe ser un número válido';
+    
+    if (!newErrors.temp_min && !newErrors.temp_max && minTemp > maxTemp) {
+      newErrors.temp_max = 'La temperatura máxima debe ser mayor o igual que la mínima';
     }
+    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -125,10 +131,15 @@ const PrediccionScreen = () => {
       let datosManuales = null;
       
       if (forceManual) {
-        // Mapear clima texto a número (para compatibilidad de backend si se requiere inverso)
-        // El formulario ya guarda en clima_num el ID del clima (1-6) a partir de CLIMA_OPTIONS
+        // Mapear clima texto a número para enviar al backend
+        const MAPEO_CLIMA = {
+            'despejado': 1, 'soleado': 1, 'parcialmente nublado': 2,
+            'nublado': 3, 'lluvia ligera': 4, 'lluvia': 5, 'tormenta': 6, 'nieve': 7
+        };
+        const climaNumCodificado = MAPEO_CLIMA[formData.clima_num] || 3;
+
         datosManuales = {
-          clima_num: parseInt(formData.clima_num),
+          clima_num: climaNumCodificado,
           temp_min: parseFloat(formData.temp_min),
           temp_max: parseFloat(formData.temp_max)
         };

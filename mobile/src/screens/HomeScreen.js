@@ -22,11 +22,13 @@ const HomeScreen = () => {
   const navigation = useNavigation();
   const { storeName, themeMode, location, hasSeenTutorial, updateHasSeenTutorial, serverStatus, setServerStatus } = useSettings();
   const [loading, setLoading] = useState(true);
+  const [loadingText, setLoadingText] = useState('🔌 Despertando servidor...');
   const [bypassLoading, setBypassLoading] = useState(false);
   const [estadisticas, setEstadisticas] = useState(null);
   const [weeklyData, setWeeklyData] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [showBypassButton, setShowBypassButton] = useState(false);
+  const [weatherApiStatus, setWeatherApiStatus] = useState('checking'); // 'checking', 'ok', 'error'
   const fadeAnim = useRef(new Animated.Value(0)).current;
   
   // Tutorial State
@@ -75,18 +77,38 @@ const HomeScreen = () => {
   const verificarConexion = async () => {
     try {
       setLoading(true);
+      setLoadingText('🔌 Despertando servidor...');
       
       // Mostrar el logo un mínimo de 3 segundos
       const minDelay = new Promise(resolve => setTimeout(resolve, 3000));
       
       // Verificar conexión con el servidor
       const connectionCheck = async () => {
-        await apiService.healthCheck();
-        setServerStatus('connected');
-        
-        // Obtener estadísticas
-        const stats = await apiService.obtenerEstadisticas();
-        setEstadisticas(stats);
+        let isReady = false;
+        while (!isReady) {
+          const health = await apiService.healthCheck();
+          
+          if (health && health.status === 'initializing') {
+            setLoadingText('⚙️ Servidor encendido, inicializando base de datos y modelos...');
+            // Esperar 2 segundos antes de reintentar
+            await new Promise(r => setTimeout(r, 2000));
+          } else {
+            setServerStatus('connected');
+            setLoadingText('✅ Conexión establecida. Sincronizando datos...');
+            
+            // Actualizar estado del clima basado en la respuesta del server
+            if (health && health.weather_api_ok) {
+              setWeatherApiStatus('ok');
+            } else {
+              setWeatherApiStatus('error');
+            }
+            
+            // Obtener estadísticas
+            const stats = await apiService.obtenerEstadisticas();
+            setEstadisticas(stats);
+            isReady = true;
+          }
+        }
       };
       
       await Promise.all([minDelay, connectionCheck()]);
@@ -158,9 +180,15 @@ const HomeScreen = () => {
           style={{ width: 120, height: 120, marginBottom: 20, borderRadius: 25 }} 
         />
         <ActivityIndicator size="large" color={isDarkMode ? '#81C784' : '#2E7D32'} />
-        <Text style={[styles.loadingText, { color: isDarkMode ? '#AAAAAA' : '#666', marginTop: 20 }]}>
-          {serverStatus === 'error' ? 'Error al conectar' : 'Despertando servidor...'}
+        <Text style={[styles.loadingText, { color: isDarkMode ? '#AAAAAA' : '#666', marginTop: 20, textAlign: 'center', paddingHorizontal: 20 }]}>
+          {serverStatus === 'error' ? 'Error al conectar' : loadingText}
         </Text>
+        
+        {showBypassButton && serverStatus !== 'error' && (
+          <Text style={{ color: isDarkMode ? '#888' : '#888', textAlign: 'center', marginTop: 10, fontSize: 13, paddingHorizontal: 30 }}>
+            El servidor en la nube gratuita de Render toma hasta 50 segundos en arrancar tras periodos de inactividad.
+          </Text>
+        )}
         
         {showBypassButton && (
           <Button 
@@ -221,6 +249,21 @@ const HomeScreen = () => {
             <View style={[styles.statusIndicator, { backgroundColor: getStatusColor() }]} />
             <Text style={[styles.statusText, { color: getStatusColor() }]}>
               {getStatusText()}
+            </Text>
+          </View>
+          <View style={[styles.statusRow, { marginTop: 10 }]}>
+            <Text style={[styles.statusLabel, dynamicStyles.text]}>Servicio de Clima:</Text>
+            <View style={[styles.statusIndicator, { 
+              backgroundColor: weatherApiStatus === 'ok' ? (isDarkMode ? '#81C784' : '#4CAF50') : 
+                               (weatherApiStatus === 'error' ? (isDarkMode ? '#E57373' : '#F44336') : 
+                               (isDarkMode ? '#FFB74D' : '#FF9800'))
+            }]} />
+            <Text style={[styles.statusText, { 
+              color: weatherApiStatus === 'ok' ? (isDarkMode ? '#81C784' : '#4CAF50') : 
+                     (weatherApiStatus === 'error' ? (isDarkMode ? '#E57373' : '#F44336') : 
+                     (isDarkMode ? '#FFB74D' : '#FF9800'))
+            }]}>
+              {weatherApiStatus === 'ok' ? 'Online' : (weatherApiStatus === 'error' ? 'Offline' : 'Verificando...')}
             </Text>
           </View>
           <View style={[styles.statusRow, { marginTop: 10 }]}>

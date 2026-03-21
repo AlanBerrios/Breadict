@@ -58,6 +58,8 @@ class PanaderiaDB:
                     pan_comprado_tarde INTEGER NOT NULL,
                     pan_vendido_maniana INTEGER NOT NULL,
                     pan_vendido_tarde INTEGER NOT NULL,
+                    clientes_sin_pan INTEGER DEFAULT 0,
+                    hora_quiebre TEXT,
                     creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
@@ -73,15 +75,28 @@ class PanaderiaDB:
                     pan_comprado_tarde INTEGER NOT NULL,
                     pan_vendido_maniana INTEGER NOT NULL,
                     pan_vendido_tarde INTEGER NOT NULL,
+                    clientes_sin_pan INTEGER DEFAULT 0,
+                    hora_quiebre TEXT,
                     creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
+            
+        # Intentar añadir columnas a tabla existente por si ya estaba creada (migración suave)
+        try:
+            cursor.execute("ALTER TABLE registros_panaderia ADD COLUMN clientes_sin_pan INTEGER DEFAULT 0;")
+        except Exception:
+            pass # Ya existe
+            
+        try:
+            cursor.execute("ALTER TABLE registros_panaderia ADD COLUMN hora_quiebre TEXT;")
+        except Exception:
+            pass # Ya existe
         
         conn.commit()
         conn.close()
     
     def insertar_registro(self, fecha, clima_promedio, temp_min, temp_max, 
-                         pan_comp_man, pan_comp_tar, pan_vend_man, pan_vend_tar):
+                         pan_comp_man, pan_comp_tar, pan_vend_man, pan_vend_tar, clientes_sin_pan=0, hora_quiebre=None):
         """Inserta o actualiza un registro de panadería"""
         conn = self.get_connection()
         cursor = conn.cursor()
@@ -90,8 +105,9 @@ class PanaderiaDB:
             cursor.execute('''
                 INSERT INTO registros_panaderia 
                 (fecha, clima_promedio, temperatura_minima, temperatura_maxima,
-                 pan_comprado_maniana, pan_comprado_tarde, pan_vendido_maniana, pan_vendido_tarde)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                 pan_comprado_maniana, pan_comprado_tarde, pan_vendido_maniana, pan_vendido_tarde,
+                 clientes_sin_pan, hora_quiebre)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (fecha) DO UPDATE SET
                     clima_promedio = EXCLUDED.clima_promedio,
                     temperatura_minima = EXCLUDED.temperatura_minima,
@@ -99,17 +115,20 @@ class PanaderiaDB:
                     pan_comprado_maniana = EXCLUDED.pan_comprado_maniana,
                     pan_comprado_tarde = EXCLUDED.pan_comprado_tarde,
                     pan_vendido_maniana = EXCLUDED.pan_vendido_maniana,
-                    pan_vendido_tarde = EXCLUDED.pan_vendido_tarde
+                    pan_vendido_tarde = EXCLUDED.pan_vendido_tarde,
+                    clientes_sin_pan = EXCLUDED.clientes_sin_pan,
+                    hora_quiebre = EXCLUDED.hora_quiebre
             ''', (fecha, clima_promedio, temp_min, temp_max, 
-                  pan_comp_man, pan_comp_tar, pan_vend_man, pan_vend_tar))
+                  pan_comp_man, pan_comp_tar, pan_vend_man, pan_vend_tar, clientes_sin_pan, hora_quiebre))
         else:
             cursor.execute('''
                 INSERT OR REPLACE INTO registros_panaderia 
                 (fecha, clima_promedio, temperatura_minima, temperatura_maxima,
-                 pan_comprado_maniana, pan_comprado_tarde, pan_vendido_maniana, pan_vendido_tarde)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                 pan_comprado_maniana, pan_comprado_tarde, pan_vendido_maniana, pan_vendido_tarde,
+                 clientes_sin_pan, hora_quiebre)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (fecha, clima_promedio, temp_min, temp_max, 
-                  pan_comp_man, pan_comp_tar, pan_vend_man, pan_vend_tar))
+                  pan_comp_man, pan_comp_tar, pan_vend_man, pan_vend_tar, clientes_sin_pan, hora_quiebre))
         
         conn.commit()
         conn.close()
@@ -120,7 +139,8 @@ class PanaderiaDB:
         
         query = '''
             SELECT fecha, clima_promedio, temperatura_minima, temperatura_maxima,
-                   pan_comprado_maniana, pan_comprado_tarde, pan_vendido_maniana, pan_vendido_tarde
+                   pan_comprado_maniana, pan_comprado_tarde, pan_vendido_maniana, pan_vendido_tarde,
+                   clientes_sin_pan, hora_quiebre
             FROM registros_panaderia 
             ORDER BY fecha
         '''
@@ -138,7 +158,8 @@ class PanaderiaDB:
         ph = "%s" if self.is_postgres else "?"
         cursor.execute(f'''
             SELECT fecha, clima_promedio, temperatura_minima, temperatura_maxima,
-                   pan_comprado_maniana, pan_comprado_tarde, pan_vendido_maniana, pan_vendido_tarde
+                   pan_comprado_maniana, pan_comprado_tarde, pan_vendido_maniana, pan_vendido_tarde,
+                   clientes_sin_pan, hora_quiebre
             FROM registros_panaderia WHERE fecha = {ph}
         ''', (fecha,))
         
@@ -154,7 +175,9 @@ class PanaderiaDB:
                 'pan_comprado_maniana': resultado[4],
                 'pan_comprado_tarde': resultado[5],
                 'pan_vendido_maniana': resultado[6],
-                'pan_vendido_tarde': resultado[7]
+                'pan_vendido_tarde': resultado[7],
+                'clientes_sin_pan': resultado[8] if len(resultado) > 8 else 0,
+                'hora_quiebre': resultado[9] if len(resultado) > 9 else None
             }
         return None
     

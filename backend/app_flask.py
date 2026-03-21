@@ -11,6 +11,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import threading
 from dotenv import load_dotenv
+import holidays
 
 load_dotenv()
 
@@ -85,7 +86,8 @@ def obtener_pronostico_api(fecha_target_str, lat=None, lon=None):
             )
             print(f"[API Backend] Usando Open-Meteo FORECAST")
 
-        response = requests.get(url)
+        # Protección contra caídas de la API: timeout de 10 segundos
+        response = requests.get(url, timeout=10)
         response.raise_for_status()
         data = response.json()
         
@@ -132,6 +134,11 @@ def preparar_datos_para_entrenamiento(df):
 
     df['ClimaNumero'] = df['ClimaNumero'].astype(int)
     
+    # Añadir features de calendario automáticas (Feriados en Chile y Días de Pago)
+    feriados_cl = holidays.CL()
+    df['EsFeriado'] = df['Fecha'].dt.date.apply(lambda x: 1 if x in feriados_cl else 0)
+    df['EsDiaPago'] = df['Fecha'].dt.day.apply(lambda x: 1 if x in [14, 15, 16, 30, 31, 1, 2] else 0)
+    
     # Crear y entrenar el encoder
     encoder = LabelEncoder()
     encoder.fit(sorted(list(MAPEO_CLIMA_TEXTO_A_NUMERO.values())))
@@ -162,7 +169,7 @@ def entrenar_modelos_globales():
             print("[Model Backend] Error preparando datos.")
             return False
 
-        features = ['temperatura_minima', 'temperatura_maxima', 'DiaSemana', 'Mes', 'DiaAnio', 'ClimaCodificado']
+        features = ['temperatura_minima', 'temperatura_maxima', 'DiaSemana', 'Mes', 'DiaAnio', 'ClimaCodificado', 'EsFeriado', 'EsDiaPago']
         
         # Verificar columnas necesarias
         if not all(col in df_preparado.columns for col in features):
@@ -170,8 +177,19 @@ def entrenar_modelos_globales():
             return False
 
         X = df_preparado[features]
-        y_maniana = df_preparado['pan_comprado_maniana'].astype(int)
-        y_tarde = df_preparado['pan_comprado_tarde'].astype(int)
+        
+        # EL SECRETO DE LA MEJORA DE IA: 
+        # Ya no entrena en base al pan "Comprado", sino a la "Demanda Real".
+        # Demanda Real = Lo que se vendió + (Clientes que se fueron sin pan * 0.5 kg estimado)
+        perdida_estimada_kg = df_preparado.get('clientes_sin_pan', pd.Series(0, index=df_preparado.index)).fillna(0).astype(int) * 0.5
+        
+        # Asignamos la pérdida estimada sugeriendo comprar más en la mañana y tarde proporcionalmente 
+        # Para simplificar y predecir lo vital, se añade a la tarde (que es donde suele haber quiebre).
+        df_preparado['demanda_real_maniana'] = df_preparado['pan_vendido_maniana'].astype(int)
+        df_preparado['demanda_real_tarde'] = df_preparado['pan_vendido_tarde'].astype(int) + perdida_estimada_kg
+
+        y_maniana = df_preparado['demanda_real_maniana']
+        y_tarde = df_preparado['demanda_real_tarde']
 
         if len(X) < 2:
             print("[Model Backend] Datos insuficientes para entrenamiento.")
@@ -208,6 +226,9 @@ def realizar_prediccion(fecha_str, temp_min, temp_max, clima_num):
         mes = fecha_dt.month
         dia_anio = int(fecha_dt.strftime('%j'))
         
+        es_feriado = 1 if fecha_dt in holidays.CL() else 0
+        es_dia_pago = 1 if fecha_dt.day in [14, 15, 16, 30, 31, 1, 2] else 0
+        
         if clima_encoder_global is None:
             return None, None, "Clima encoder no inicializado"
             
@@ -219,7 +240,9 @@ def realizar_prediccion(fecha_str, temp_min, temp_max, clima_num):
             'DiaSemana': dia_semana,
             'Mes': mes,
             'DiaAnio': dia_anio,
-            'ClimaCodificado': clima_codificado
+            'ClimaCodificado': clima_codificado,
+            'EsFeriado': es_feriado,
+            'EsDiaPago': es_dia_pago
         }])
         
         datos_prediccion = datos_prediccion[features_entrenamiento]
@@ -263,9 +286,15 @@ def inicializar():
     status_entrenamiento = entrenar_modelos_globales()
     print(f"[App Backend] Modelos entrenados al inicio: {'Sí' if status_entrenamiento else 'No (Faltan datos)'}")
 
-# Llamar a la inicialización manualmente
-with app.app_context():
-    inicializar()
+# Llamar a la inicialización en un hilo separado para no bloquear el inicio del servidor
+# Esto evita que Render de error de "Port scan timeout"
+def iniciar_segundo_plano():
+    with app.app_context():
+        inicializar()
+
+thread = threading.Thread(target=iniciar_segundo_plano)
+thread.daemon = True
+thread.start()
 
 # --- Endpoints de la API ---
 
@@ -275,7 +304,7 @@ def index():
     return jsonify({
         "message": "🍞 Breadict API is Online",
         "version": "2.1.0",
-        "status": "ready",
+        "status": "ready" if db else "initializing",
         "endpoints": {
             "health": "/api/health",
             "predict": "/api/prediccion",
@@ -286,6 +315,8 @@ def index():
 @app.route('/api/registro', methods=['POST'])
 def registrar_datos():
     """Registra los datos reales de ventas del día"""
+    if db is None:
+        return jsonify({"error": "El servidor se está inicializando. Reintente en unos segundos."}), 503
     try:
         data = request.get_json()
         if not data:
@@ -311,13 +342,17 @@ def registrar_datos():
         if clima_texto not in MAPEO_CLIMA_TEXTO_A_NUMERO:
             return jsonify({"error": f"Clima no válido. Usar: {list(MAPEO_CLIMA_TEXTO_A_NUMERO.keys())}"}), 400
 
+        clientes_sin_pan = data.get('clientes_sin_pan', 0)
+        hora_quiebre = data.get('hora_quiebre', None)
+
         if db is not None:
             # Insertar en base de datos
             db.insertar_registro(
                 fecha_str, clima_texto,
                 float(data['temperatura_minima']), float(data['temperatura_maxima']),
                 int(data['pan_comprado_maniana']), int(data['pan_comprado_tarde']),
-                int(data['pan_vendido_maniana']), int(data['pan_vendido_tarde'])
+                int(data['pan_vendido_maniana']), int(data['pan_vendido_tarde']),
+                int(clientes_sin_pan), hora_quiebre
             )
 
         # Reentrenar modelos con el nuevo dato en segundo plano para no bloquear
@@ -517,6 +552,8 @@ def obtener_analiticas():
 @app.route('/api/registro/existe', methods=['GET'])
 def check_registro_exists():
     """Verifica si ya existe un registro para una fecha dada"""
+    if db is None:
+        return jsonify({"error": "Inicializando...", "exists": False}), 503
     fecha = request.args.get('fecha')
     if not fecha:
         return jsonify({"error": "Fecha requerida"}), 400
@@ -530,6 +567,8 @@ def check_registro_exists():
 @app.route('/api/exportar', methods=['GET'])
 def exportar_csv():
     """Exporta todos los registros como CSV"""
+    if db is None:
+        return jsonify({"error": "Servidor no listo"}), 503
     try:
         df = db.obtener_todos_los_datos()
         if df.empty:
@@ -546,12 +585,28 @@ def exportar_csv():
 @app.route('/api/health', methods=['GET'])
 def health_check():
     """Endpoint para verificar que el servidor está funcionando"""
+    is_ready = db is not None
+    db_type = "pending"
+    if is_ready:
+        db_type = "PostgreSQL (Cloud)" if db.is_postgres else "SQLite (Local)"
+    
+    # Verificar clima (Open-Meteo) de forma rápida
+    weather_ok = False
+    try:
+        # Petición minimalista para probar conectividad
+        test_weather = requests.get("https://api.open-meteo.com/v1/forecast?latitude=0&longitude=0&daily=weathercode&timezone=auto&forecast_days=1", timeout=3)
+        weather_ok = test_weather.status_code == 200
+    except:
+        weather_ok = False
+
     return jsonify({
-        "status": "ok",
+        "status": "ok" if is_ready else "initializing",
         "timestamp": datetime.datetime.now().isoformat(),
         "version": "2.1.0",
-        "weather_api": "Open-Meteo (gratis, sin API key)",
-        "database_type": "PostgreSQL (Cloud)" if db and db.is_postgres else "SQLite (Local)"
+        "database_connected": is_ready,
+        "database_type": db_type,
+        "models_trained": (modelo_maniana_global is not None) if is_ready else False,
+        "weather_api_ok": weather_ok
     }), 200
 
 if __name__ == '__main__':
