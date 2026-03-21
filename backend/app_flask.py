@@ -53,13 +53,28 @@ init_lock = threading.Lock()
 init_started = False
 pid_init = None
 
+# Cache de clima para evitar Rate Limit (429)
+# Formato: {(fecha, lat, lon): (datos, timestamp)}
+weather_cache = {}
+weather_cache_lock = threading.Lock()
+WEATHER_CACHE_TTL = 3600  # 1 hora en segundos
+
 # --- Funciones de Utilidad ---
 def obtener_pronostico_api(fecha_target_str, lat=None, lon=None):
     """Obtiene el clima para cualquier fecha usando Open-Meteo (gratis, sin API key)"""
-    print(f"[API Backend] Solicitando clima Open-Meteo para: {fecha_target_str} (lat:{lat}, lon:{lon})")
+    use_lat = round(float(lat), 2) if lat else DEFAULT_LAT
+    use_lon = round(float(lon), 2) if lon else DEFAULT_LON
     
-    use_lat = lat if lat else DEFAULT_LAT
-    use_lon = lon if lon else DEFAULT_LON
+    # 1. Verificar Cache
+    cache_key = (fecha_target_str, use_lat, use_lon)
+    with weather_cache_lock:
+        if cache_key in weather_cache:
+            datos, ts = weather_cache[cache_key]
+            if (datetime.datetime.now() - ts).total_seconds() < WEATHER_CACHE_TTL:
+                print(f"[API Backend] Usando CLIMA DESDE CACHE para: {fecha_target_str}")
+                return datos
+
+    print(f"[API Backend] Solicitando clima Open-Meteo para: {fecha_target_str} (lat:{use_lat}, lon:{use_lon})")
     
     try:
         fecha_target_dt = datetime.datetime.strptime(fecha_target_str, "%Y-%m-%d").date()
@@ -68,7 +83,7 @@ def obtener_pronostico_api(fecha_target_str, lat=None, lon=None):
         
         # Decidir qué endpoint usar
         if delta_dias < 0:
-            # FECHA PASADA → usar Archive API (datos históricos)
+            # FECHA PASADA → usar Archive API
             url = (
                 f"https://archive-api.open-meteo.com/v1/archive"
                 f"?latitude={use_lat}&longitude={use_lon}"
@@ -76,7 +91,6 @@ def obtener_pronostico_api(fecha_target_str, lat=None, lon=None):
                 f"&daily=temperature_2m_max,temperature_2m_min,weathercode"
                 f"&timezone=America/Santiago"
             )
-            print(f"[API Backend] Usando Open-Meteo ARCHIVO (histórico)")
         else:
             # HOY o FUTURO → usar Forecast API
             url = (
@@ -86,9 +100,7 @@ def obtener_pronostico_api(fecha_target_str, lat=None, lon=None):
                 f"&timezone=America/Santiago"
                 f"&start_date={fecha_target_str}&end_date={fecha_target_str}"
             )
-            print(f"[API Backend] Usando Open-Meteo FORECAST")
 
-        # Protección contra caídas de la API: timeout de 10 segundos
         response = requests.get(url, timeout=10)
         response.raise_for_status()
         data = response.json()
@@ -99,7 +111,6 @@ def obtener_pronostico_api(fecha_target_str, lat=None, lon=None):
         weather_codes = daily.get('weathercode', [])
         
         if not temps_min or not temps_max:
-            print(f"[API Backend] Open-Meteo no retornó datos para {fecha_target_str}")
             return "manual"
         
         temp_min = round(temps_min[0])
@@ -109,12 +120,17 @@ def obtener_pronostico_api(fecha_target_str, lat=None, lon=None):
         clima_num = wmo_code_a_clima_interno(wmo_code)
         clima_texto = MAPEO_CLIMA_NUMERO_A_TEXTO.get(clima_num, "nublado")
         
-        print(f"[API Backend] Open-Meteo OK: {temp_min}°C-{temp_max}°C, WMO:{wmo_code} → {clima_texto}")
-        return temp_min, temp_max, clima_num, clima_texto
+        resultado = (temp_min, temp_max, clima_num, clima_texto)
+        
+        # 2. Guardar en Cache
+        with weather_cache_lock:
+            weather_cache[cache_key] = (resultado, datetime.datetime.now())
+            
+        print(f"[API Backend] Open-Meteo OK: {temp_min}°C-{temp_max}°C → {clima_texto}")
+        return resultado
 
     except Exception as e:
         print(f"[API Backend] Error Open-Meteo: {e}")
-        traceback.print_exc()
     return "manual"
 
 def preparar_datos_para_entrenamiento(df):
