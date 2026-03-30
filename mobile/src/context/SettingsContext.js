@@ -22,7 +22,12 @@ export const SettingsProvider = ({ children }) => {
   
   // Estado de conexión global
   const [serverStatus, setServerStatus] = useState('checking'); // 'checking' | 'connected' | 'error'
-  
+
+  // Notificaciones
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [morningAlertTime, setMorningAlertTime] = useState('08:00');
+  const [nightAlertTime, setNightAlertTime] = useState('23:00');
+
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -38,6 +43,9 @@ export const SettingsProvider = ({ children }) => {
       const storedLimitA = await AsyncStorage.getItem('@limit_afternoon');
       const storedLocation = await AsyncStorage.getItem('@location');
       const storedTutorial = await AsyncStorage.getItem('@has_seen_tutorial');
+      const storedNotifEnabled = await AsyncStorage.getItem('@notifications_enabled');
+      const storedMorningT = await AsyncStorage.getItem('@morning_alert_time');
+      const storedNightT = await AsyncStorage.getItem('@night_alert_time');
 
       if (storedName) setStoreName(storedName);
       if (storedTheme) setThemeMode(storedTheme);
@@ -65,6 +73,10 @@ export const SettingsProvider = ({ children }) => {
       } else {
         setHasSeenTutorial(false); // Si no existe, es que no lo ha visto
       }
+
+      if (storedNotifEnabled !== null) setNotificationsEnabled(JSON.parse(storedNotifEnabled));
+      if (storedMorningT) setMorningAlertTime(storedMorningT);
+      if (storedNightT) setNightAlertTime(storedNightT);
       
     } catch (e) {
       console.log('Error loading settings', e);
@@ -105,6 +117,15 @@ export const SettingsProvider = ({ children }) => {
     await AsyncStorage.setItem('@has_seen_tutorial', JSON.stringify(value));
   };
 
+  const updateNotificationSettings = async (enabled, morning, night) => {
+    setNotificationsEnabled(enabled);
+    setMorningAlertTime(morning);
+    setNightAlertTime(night);
+    await AsyncStorage.setItem('@notifications_enabled', JSON.stringify(enabled));
+    await AsyncStorage.setItem('@morning_alert_time', morning);
+    await AsyncStorage.setItem('@night_alert_time', night);
+  };
+
   const value = {
     storeName,
     themeMode,
@@ -119,6 +140,10 @@ export const SettingsProvider = ({ children }) => {
     updateLimits,
     updateLocation,
     updateHasSeenTutorial,
+    notificationsEnabled,
+    morningAlertTime,
+    nightAlertTime,
+    updateNotificationSettings,
     serverStatus,
     setServerStatus,
     loading

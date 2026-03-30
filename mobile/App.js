@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Image, View, Text } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
@@ -11,6 +11,7 @@ import RegistroScreen from './src/screens/RegistroScreen';
 import PrediccionScreen from './src/screens/PrediccionScreen';
 import ConfiguracionScreen from './src/screens/ConfiguracionScreen';
 import AnaliticasScreen from './src/screens/AnaliticasScreen';
+import notificationService from './src/services/notificationService';
 
 const Stack = createStackNavigator();
 
@@ -75,13 +76,26 @@ const ConnectionBanner = () => {
 };
 
 function AppNavigation() {
-  const { themeMode } = useSettings();
+  const { themeMode, nightAlertTime, notificationsEnabled } = useSettings();
   const isDark = themeMode === 'dark';
   
   const headerOptions = {
     headerStyle: { backgroundColor: isDark ? '#1E1E1E' : '#2E7D32' },
     headerTintColor: '#fff',
   };
+
+  useEffect(() => {
+    const initNotifications = async () => {
+      const hasPermission = await notificationService.requestPermissions();
+      if (hasPermission) {
+        // Al iniciar, asegurar que las tareas estén registradas
+        await notificationService.registerBackgroundTasks();
+        // Sincronizar el recordatorio de la noche
+        await notificationService.scheduleEveningReminder(nightAlertTime, notificationsEnabled);
+      }
+    };
+    initNotifications();
+  }, []);
 
   return (
     <NavigationContainer>

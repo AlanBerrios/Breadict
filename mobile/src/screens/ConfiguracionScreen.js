@@ -25,7 +25,11 @@ const ConfiguracionScreen = () => {
     updateThemeMode,
     updateAutoPredict,
     updateLimits,
-    updateLocation
+    updateLocation,
+    notificationsEnabled,
+    morningAlertTime,
+    nightAlertTime,
+    updateNotificationSettings
   } = useSettings();
 
   const navigation = useNavigation();
@@ -38,6 +42,10 @@ const ConfiguracionScreen = () => {
   const [tempLimitA, setTempLimitA] = useState(limitAfternoon ? limitAfternoon.toString() : '14');
   const [tempLocation, setTempLocation] = useState(location);
   const [fetchingLocation, setFetchingLocation] = useState(false);
+  
+  const [notifEnabled, setNotifEnabled] = useState(notificationsEnabled);
+  const [tempMorningAlert, setTempMorningAlert] = useState(morningAlertTime);
+  const [tempNightAlert, setTempNightAlert] = useState(nightAlertTime);
 
   // Sync state if context changes externally
   useEffect(() => {
@@ -47,7 +55,10 @@ const ConfiguracionScreen = () => {
     setTempLimitM(limitMorning ? limitMorning.toString() : '8');
     setTempLimitA(limitAfternoon ? limitAfternoon.toString() : '14');
     setTempLocation(location);
-  }, [storeName, themeMode, autoPredict, limitMorning, limitAfternoon, location]);
+    setNotifEnabled(notificationsEnabled);
+    setTempMorningAlert(morningAlertTime);
+    setTempNightAlert(nightAlertTime);
+  }, [storeName, themeMode, autoPredict, limitMorning, limitAfternoon, location, notificationsEnabled, morningAlertTime, nightAlertTime]);
 
   const saveSettings = async (showFeedback = true) => {
     try {
@@ -79,6 +90,18 @@ const ConfiguracionScreen = () => {
       await updateAutoPredict(isAuto);
       await updateLimits(lm, la);
       await updateLocation(tempLocation);
+      await updateNotificationSettings(notifEnabled, tempMorningAlert, tempNightAlert);
+
+      // Programar notificaciones si están activas
+      try {
+        const notificationService = require('../services/notificationService').default;
+        await notificationService.scheduleEveningReminder(tempNightAlert, notifEnabled);
+        if (notifEnabled) {
+          await notificationService.registerBackgroundTasks();
+        }
+      } catch (e) {
+        console.log('Error scheduling notifications:', e);
+      }
 
       return true;
     } catch (e) {
@@ -371,6 +394,60 @@ const ConfiguracionScreen = () => {
                   }}
                 />
               </View>
+            </View>
+          )}
+
+        </Card.Content>
+      </Card>
+
+      <Card style={styles.card}>
+        <Card.Content>
+          <Title style={styles.cardTitle}>Notificaciones Inteligentes</Title>
+          
+          <View style={styles.settingRow}>
+            <View style={styles.settingTextContainer}>
+              <Text style={styles.settingTitle}>Activar Alertas Diarias</Text>
+              <Text style={styles.settingDescription}>
+                Recibe la predicción en la mañana y un recordatorio en la noche.
+              </Text>
+            </View>
+            <Switch
+              value={notifEnabled}
+              onValueChange={setNotifEnabled}
+              color={isDarkMode ? '#81C784' : '#2E7D32'}
+            />
+          </View>
+
+          {notifEnabled && (
+            <View style={styles.hoursContainer}>
+              <View style={styles.rowInputs}>
+                <TextInput
+                  label="Alerta Mañana (Ej: 08:00)"
+                  value={tempMorningAlert}
+                  onChangeText={setTempMorningAlert}
+                  mode="outlined"
+                  placeholder="08:00"
+                  maxLength={5}
+                  style={styles.halfInput}
+                  textColor={isDarkMode ? '#FFFFFF' : '#000000'}
+                  theme={{ colors: { primary: isDarkMode ? '#81C784' : '#2E7D32' } }}
+                />
+
+                <TextInput
+                  label="Aviso Noche (Ej: 23:00)"
+                  value={tempNightAlert}
+                  onChangeText={setTempNightAlert}
+                  mode="outlined"
+                  placeholder="23:00"
+                  maxLength={5}
+                  style={styles.halfInput}
+                  textColor={isDarkMode ? '#FFFFFF' : '#000000'}
+                  theme={{ colors: { primary: isDarkMode ? '#81C784' : '#2E7D32' } }}
+                />
+              </View>
+              <Text style={[styles.settingDescription, { marginTop: 10 }]}>
+                La alerta de la mañana intentará despertar al servidor para darte la predicción exacta.
+              </Text>
             </View>
           )}
 
