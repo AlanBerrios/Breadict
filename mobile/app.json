@@ -2,7 +2,7 @@
   "expo": {
     "name": "Breadict",
     "slug": "breadict",
-    "version": "2.3.0",
+    "version": "2.4.2",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -25,7 +25,10 @@
       "package": "com.alanberrios.breadict",
       "permissions": [
         "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION"
+        "ACCESS_COARSE_LOCATION",
+        "RECEIVE_BOOT_COMPLETED",
+        "WAKE_LOCK",
+        "POST_NOTIFICATIONS"
       ]
     },
     "web": {
@@ -38,7 +41,9 @@
         {
           "locationAlwaysAndWhenInUsePermission": "Breadict necesita tu ubicación para obtener el clima local automáticamente."
         }
-      ]
+      ],
+      "expo-notifications",
+      "expo-task-manager"
     ],
     "description": "Sistema inteligente para predecir compras de pan en panaderías, usando IA y datos climáticos.",
     "extra": {
